@@ -1,0 +1,10 @@
+opencv-python==4.4.0.46
+tensorflow==2.10.0
+matplotlib==3.6.2
+numpy==1.22.4
+keras==2.10.0
+pycocotools~=2.0.6
+Pillow~=9.4.0
+waitress~=2.1.2
+segmentation-models==1.0.1
+keras-unet==0.1.2
