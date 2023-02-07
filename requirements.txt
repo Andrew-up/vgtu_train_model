@@ -1,4 +1,4 @@
-opencv-python==4.4.0.46
+opencv-python==4.5.5.64
 tensorflow==2.10.0
 matplotlib==3.6.2
 numpy==1.22.4
