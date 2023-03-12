@@ -44,7 +44,7 @@ def main():
 
     history = train_model(path_model=MODEL_H5_PATH,
                           model=model,
-                          n_epoch=50,
+                          n_epoch=200,
                           batch_size=8,
                           dataset_train=train_generator_class,
                           dataset_valid=valid_generator_class,
