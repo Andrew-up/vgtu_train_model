@@ -7,4 +7,9 @@ def SGD_loss():
                          momentum=0.9,
                          nesterov=True
                          )
+    # opt = optimizers.SGD(learning_rate=5,
+    #                      decay=6,
+    #                      momentum=0.9,
+    #                      nesterov=True
+    #                      )
     return opt

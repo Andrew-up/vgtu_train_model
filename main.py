@@ -1,19 +1,15 @@
 import matplotlib.pyplot as plt
-import numpy as np
-from keras.models import Model, load_model
-from keras.utils import img_to_array
-from utils.vizualizators import vizualizator
-from definitions import MODEL_H5_PATH, ANNOTATION_FILE_PATH, DATASET_PATH
+
+from definitions import MODEL_H5_PATH, ANNOTATION_FILE_PATH
 from utils.DataGeneratorFromCocoJson import DataGeneratorFromCocoJson
 from utils.build_model import unet_model
 from utils.get_dataset_coco import filterDataset
-from utils.model_losses import dice_coef, bce_dice_loss
 from utils.model_train import train_model
+from utils.vizualizators import vizualizator
 
 
 def main():
     images_train, images_valid, coco, classes = filterDataset(ANNOTATION_FILE_PATH, percent_valid=30)
-
 
     # return 0
     train_generator_class = DataGeneratorFromCocoJson(batch_size=8,
@@ -32,7 +28,6 @@ def main():
                                                       coco=coco,
                                                       shuffle=False)
 
-
     img_list, img_mask = train_generator_class.__getitem__(1)
     vizualizator(img_list, img_mask)
     # print(img_mask)
@@ -40,7 +35,6 @@ def main():
     model = unet_model(MODEL_H5_PATH)
     # print(model.summary())
     # return 0
-
 
     history = train_model(path_model=MODEL_H5_PATH,
                           model=model,
@@ -66,7 +60,6 @@ def main():
     plt.xlabel('epoch')
     plt.legend(['train', 'val'], loc='upper left')
     plt.show()
-
 
     model.save(MODEL_H5_PATH)
 

@@ -1,5 +1,7 @@
-from keras.callbacks import ReduceLROnPlateau, EarlyStopping, ModelCheckpoint, LambdaCallback
 import tensorflow as tf
+from keras.callbacks import ReduceLROnPlateau, EarlyStopping, ModelCheckpoint, LambdaCallback
+
+from controller_vgtu_train.subprocess_train_model_controller import update_model_history
 from definitions import TENSORBOARD_LOGS
 from model.model_history import ModelHistory
 
@@ -10,17 +12,15 @@ class callback_bce_dice_loss():
                  path=None,
                  monitor='val_dice_coef',
                  mode='auto',
-                 model_history_train: ModelHistory() = None):
+                 model_history: ModelHistory = None):
         super().__init__()
         self.path = path
         self.monitor = monitor
         self.mode = mode
-        self.model_history: ModelHistory = model_history_train
-
+        self.result_model_history: ModelHistory() = model_history
 
     def tb_callback(self):
         return tf.keras.callbacks.TensorBoard(TENSORBOARD_LOGS, update_freq=1)
-
 
     def checkpoint(self):
         _checkpoint = ModelCheckpoint(
@@ -50,14 +50,26 @@ class callback_bce_dice_loss():
                                         mode=self.mode)
         return _early_stopping
 
+    def on_epoch_end_update(self, epoch, logs):
+        if self.result_model_history:
+            print(type(epoch))
+            print(epoch)
+            print(logs)
+            self.result_model_history.current_epochs = epoch
+            update_model_history(self.result_model_history)
 
-    def jjjjjjjj(self, epoch, logs):
-        if self.model_history:
-            print(self.model_history.status)
-        # print('22222222222')
-        # print(epoch)
-        print(logs)
+    def on_train_end_update(self, logs):
+        if self.result_model_history:
+            self.result_model_history.status = 'compleated'
+            update_model_history(self.result_model_history)
+
+    def on_train_begin_update(self, logs):
+        if self.result_model_history:
+            self.result_model_history.status = 'train'
+            update_model_history(self.result_model_history)
+
     def print_test(self):
-        lambda_callback = LambdaCallback(on_epoch_end=lambda batch, logs: self.jjjjjjjj(batch, logs=logs))
+        lambda_callback = LambdaCallback(on_epoch_end=lambda batch, logs: self.on_epoch_end_update(batch, logs=logs),
+                                         on_train_end=lambda logs: self.on_train_end_update(logs),
+                                         on_train_begin=lambda logs: self.on_train_begin_update(logs))
         return lambda_callback
-

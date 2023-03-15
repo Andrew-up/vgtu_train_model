@@ -8,7 +8,8 @@ class ModelHistory(object):
         self.quality_dataset = None
         self.quality_train_dataset = None
         self.quality_valid_dataset = None
-        self.epochs = None
+        self.current_epochs = None
+        self.total_epochs = None
         self.time_train = None
         self.num_classes = None
         self.input_size = None
