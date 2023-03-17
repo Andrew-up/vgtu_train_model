@@ -1,7 +1,12 @@
+import os.path
+
 from keras.models import Sequential
 
 from controller_vgtu_train.subprocess_train_model_controller import get_last_model_history
 from utils.model_callbacks import callback_bce_dice_loss
+from controller_vgtu_train.subprocess_train_model_controller import update_model_history
+from definitions import MODEL_H5_PATH
+from model.model_history import ModelHistory
 
 
 def train_model(model: Sequential,
@@ -10,9 +15,12 @@ def train_model(model: Sequential,
                 batch_size=8,
                 dataset_train=None,
                 dataset_valid=None,
-                dataset_size_train=0):
-    model_history = get_last_model_history()
-    model_history.total_epochs = n_epoch
+                dataset_size_train=0,
+                model_history: ModelHistory = None):
+    if model_history:
+        model_history.total_epochs = n_epoch
+        update_model_history(model_history)
+
     callback = callback_bce_dice_loss(path=path_model,
                                       monitor='val_dice_coef',
                                       mode='max',

@@ -60,8 +60,7 @@ class callback_bce_dice_loss():
 
     def on_train_end_update(self, logs):
         if self.result_model_history:
-            self.result_model_history.status = 'compleated'
-            update_model_history(self.result_model_history)
+            print("Завершено обучение модели")
 
     def on_train_begin_update(self, logs):
         if self.result_model_history:

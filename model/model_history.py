@@ -3,6 +3,7 @@ class ModelHistory(object):
     def __init__(self, **entries):
         self.id = None
         self.version = None
+        self.name_file = None
         self.accuracy = None
         self.date_train = None
         self.quality_dataset = None

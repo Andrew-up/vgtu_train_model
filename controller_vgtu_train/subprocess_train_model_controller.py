@@ -8,7 +8,7 @@ API = 'http://localhost:5000/api/model_cnn/'
 
 
 def get_last_model_history():
-    r = requests.get(API + 'train/')
+    r = requests.get(API + 'last_model/')
     m = ModelHistory(**r.json())
     return m
 
