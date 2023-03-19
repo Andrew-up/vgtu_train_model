@@ -1,9 +1,13 @@
+import random
+
 import matplotlib.pyplot as plt
 import tensorflow as tf
 import cv2
 import numpy as np
 from pycocotools.coco import COCO
 from definitions import DATASET_PATH
+
+
 
 
 class DataGeneratorFromCocoJson(tf.keras.utils.Sequence):
@@ -50,6 +54,7 @@ class DataGeneratorFromCocoJson(tf.keras.utils.Sequence):
             pixel_value = self.classes.index(className) + 1
             new_mask = cv2.resize(self.coco.annToMask(
                 anns[a]) * pixel_value, self.input_image_size)
+            # print('--------------------')
             train_mask = np.maximum(new_mask, train_mask)
             # train_mask = new_mask / 255.0
         # plt.imshow(train_mask)
@@ -63,7 +68,10 @@ class DataGeneratorFromCocoJson(tf.keras.utils.Sequence):
         for j, categorie in enumerate(self.catIds):
             annIds = self.coco.getAnnIds(image_id, catIds=categorie, iscrowd=None)
             anns = self.coco.loadAnns(annIds)
+            # print(image_id)
+            # print('SSSSSSSSSSSS')
             mask = self.getNormalMask(image_id, categorie)
+            # print(type(mask))
             res.append(mask)
         return res
 
@@ -89,28 +97,88 @@ class DataGeneratorFromCocoJson(tf.keras.utils.Sequence):
         # print(imagePath)
         return imagePath
 
+    def flip_random(self, img, mask):
+        flip_bool = bool(random.getrandbits(1))
+        if flip_bool:
+            img = np.flip(img)
+            mask_list = []
+            for i in mask:
+                mask_list.append(np.flip(i))
+            return img, mask_list
+        return img, mask
+
+    def rot90_random(self, img, mask):
+        flip_bool = bool(random.getrandbits(1))
+        if flip_bool:
+            img = np.rot90(img)
+            mask_list = []
+            for i in mask:
+                mask_list.append(np.rot90(i))
+            return img, mask_list
+        return img, mask
+
+
     def __getitem__(self, index):
         X = np.empty((self.batch_size, 128, 128, 3))
-        y = np.empty((self.batch_size, 128, 128, 3))
+        y = np.empty((self.batch_size, 128, 128, 12))
         indexes = self.indexes[index * self.batch_size:(index + 1) * self.batch_size]
+        # print(range(len(indexes)))
 
+        # return 0
         for i in range(len(indexes)):
             value = indexes[i]
             img_info = self.image_list[value]
-            w = img_info['height']
-            h = img_info['width']
-            X[i,] = self.getImage(self.getImagePathByCocoId(img_info['id']))
+            # w = img_info['height']
+            # h = img_info['width']
+            img = self.getImage(self.getImagePathByCocoId(img_info['id']))
+            # print(X.shape)
+            # print('______________________')
             # plt.imshow(self.getImage(getImagePathById(img_info['id'])))
-
             mask_train = self.getLevelsMask(img_info['id'])
-            # print(mask_train[2])
+            X[i, ], mask_train = self.flip_random(img, mask_train)
+            X[i, ], mask_train = self.rot90_random(X[i, ], mask_train)
+            X[i, ] = tf.image.random_brightness((X[i, ]*255).astype(np.uint8), 0.2)
+            X[i, ] = tf.image.random_contrast(X[i, ], 0.5, 0.8) / 255
+            # plt.imshow(X[i, ])
+            # plt.show()
+
+            # print(X[i, ])
+            # print(type(mask_train))
+            # print(type(X[i, ]))
+
+            # print(len(mask_train))
+
+
+            # print(i)
             for j in self.catIds:
-                y[i, :, :, j - 1] = mask_train[j - 1]
-                y[i, :, :, j - 1] = mask_train[j - 1]
-                y[i, :, :, j - 1] = mask_train[j - 1]
+
+                # print('==============')
+                # print(f'i: {i}')
+                # print(f'j: {j}')
+                y[i, :, :, j-1] = mask_train[j-1]
+                # y[i, :, :, j-1] = mask_train[j-1]
+                # y[i, :, :, j-1] = mask_train[j-1]
+                #
+                # y[i, :, :, j-1] = mask_train[j-1]
+                # y[i, :, :, j-1] = mask_train[j-1]
+                # y[i, :, :, j-1] = mask_train[j-1]
+                #
+                # y[i, :, :, j-1] = mask_train[j-1]
+                # y[i, :, :, j-1] = mask_train[j-1]
+                # y[i, :, :, j-1] = mask_train[j-1]
+                #
+                # y[i, :, :, j-1] = mask_train[j-1]
+                # y[i, :, :, j-1] = mask_train[j-1]
+                # y[i, :, :, j-1] = mask_train[j-1]
+
+                # y[i, :, :, j-1] = mask_train[j-1]
+                # y[i, :, :, j-1] = mask_train[j-1]
+
+
 
         X = np.array(X)
         y = np.array(y)
+        # print('111111111111111')
 
         if self.subset == 'train':
             return X, y

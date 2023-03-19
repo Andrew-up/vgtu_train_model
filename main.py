@@ -13,6 +13,7 @@ from controller_vgtu_train.subprocess_train_model_controller import get_last_mod
 from datetime import datetime
 import zipfile
 from utils.helpers import delete_legacy_models_and_zip
+from utils.model_losses import plot_segm_history
 
 
 def main():
@@ -22,11 +23,11 @@ def main():
     else:
         print(f'Удалено старых моделей h5 и zip архивов: {check_garbage_files_count}')
     timer = time.time()
-    images_train, images_valid, coco, classes = filterDataset(ANNOTATION_FILE_PATH, percent_valid=30)
+    images_train, images_valid, coco, classes = filterDataset(ANNOTATION_FILE_PATH, percent_valid=50)
 
     h, w, n_c = 128, 128, len(classes)
 
-    train_generator_class = DataGeneratorFromCocoJson(batch_size=8,
+    train_generator_class = DataGeneratorFromCocoJson(batch_size=2,
                                                       subset='train',
                                                       input_image_size=(128, 128),
                                                       image_list=images_train,
@@ -34,7 +35,7 @@ def main():
                                                       coco=coco,
                                                       shuffle=False)
 
-    valid_generator_class = DataGeneratorFromCocoJson(batch_size=8,
+    valid_generator_class = DataGeneratorFromCocoJson(batch_size=2,
                                                       subset='train',
                                                       input_image_size=(128, 128),
                                                       image_list=images_valid,
@@ -42,10 +43,21 @@ def main():
                                                       coco=coco,
                                                       shuffle=False)
 
-    img_list, img_mask = train_generator_class.__getitem__(1)
+    # return 0
+
+    img_list, img_mask = train_generator_class.__getitem__(0)
+
+    print(f'h, w, n_c: {h, w, n_c}')
+
     vizualizator(img_list, img_mask)
 
-    model = unet_model(len(classes), (h, w, n_c))
+    # return 0
+    # print(img_list.shape)
+    # print(img_mask.shape)
+    # return 0
+    model = unet_model(len(classes))
+    # print(model.summary())
+    # return 0
     path_model = os.path.join(MODEL_H5_PATH, MODEL_H5_FILE_NAME)
     model_history = get_last_model_history()
     if model_history:
@@ -53,29 +65,33 @@ def main():
 
     history = train_model(path_model=path_model,
                           model=model,
-                          n_epoch=1,
-                          batch_size=8,
+                          n_epoch=100,
+                          batch_size=2,
                           dataset_train=train_generator_class,
                           dataset_valid=valid_generator_class,
                           dataset_size_train=len(images_train),
                           model_history=model_history)
 
-    plt.plot(history.history['loss'])
-    plt.plot(history.history['val_loss'])
-    plt.title('model loss')
-    plt.ylabel('loss')
-    plt.xlabel('epoch')
-    plt.legend(['train', 'val'], loc='upper left')
-    plt.show()
+    plot_segm_history(history)
+
+
+
+    # plt.plot(history.history['loss'])
+    # plt.plot(history.history['val_loss'])
+    # plt.title('model loss')
+    # plt.ylabel('loss')
+    # plt.xlabel('epoch')
+    # plt.legend(['train', 'val'], loc='upper left')
+    # plt.show()
 
     # summarize history for IOU
-    plt.plot(history.history['dice_coef'])
-    plt.plot(history.history['val_dice_coef'])
-    plt.title('dice_coef iou')
-    plt.ylabel('iou')
-    plt.xlabel('epoch')
-    plt.legend(['train', 'val'], loc='upper left')
-    plt.show()
+    # plt.plot(history.history['iou_coef'])
+    # plt.plot(history.history['val_iou_coef'])
+    # plt.title('iou_coef iou')
+    # plt.ylabel('iou')
+    # plt.xlabel('epoch')
+    # plt.legend(['train', 'val'], loc='upper left')
+    # plt.show()
 
     path_zip = zipfile.ZipFile(f'{os.path.splitext(path_model)[0]}.zip', 'w')
     path_zip.write(path_model, arcname=f'{model_history.name_file}')

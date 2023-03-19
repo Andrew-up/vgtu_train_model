@@ -25,7 +25,6 @@ class callback_bce_dice_loss():
     def checkpoint(self):
         _checkpoint = ModelCheckpoint(
             filepath=self.path,
-            monitor=self.monitor,
             verbose=1,
             save_best_only=True,
             save_weights_only=False,
@@ -52,11 +51,11 @@ class callback_bce_dice_loss():
 
     def on_epoch_end_update(self, epoch, logs):
         if self.result_model_history:
-            print(type(epoch))
-            print(epoch)
-            print(logs)
+            # print(type(epoch))
+            # print(epoch)
+            # print(logs)
             self.result_model_history.current_epochs = epoch
-            update_model_history(self.result_model_history)
+            # update_model_history(self.result_model_history)
 
     def on_train_end_update(self, logs):
         if self.result_model_history:
