@@ -1,5 +1,7 @@
 import os.path
+import random
 
+import keras.utils
 from matplotlib import gridspec, pyplot as plt
 import matplotlib.patches as mpatches
 import matplotlib as mpl
@@ -11,8 +13,12 @@ from keras.utils import img_to_array
 from definitions import ANNOTATION_FILE_PATH, DATASET_PATH, MODEL_H5_PATH
 from utils.DataGeneratorFromCocoJson import DataGeneratorFromCocoJson
 from utils.get_dataset_coco import filterDataset
-from utils.model_losses import dice_coef, bce_dice_loss, jaccard_distance, iou, jaccard_coef, dice_loss
+from utils.model_losses import dice_coef, bce_dice_loss, jaccard_distance, iou, jaccard_coef, dice_coef_loss, \
+    binary_weighted_cross_entropy
 
+class MyMeanIOU(tf.keras.metrics.MeanIoU):
+    def update_state(self, y_true, y_pred, sample_weight=None):
+        return super().update_state(tf.argmax(y_true, axis=-1), tf.argmax(y_pred, axis=-1), sample_weight)
 
 def vizualizator(list_images, list_masks):
     x, y = list_images, list_masks
@@ -106,8 +112,11 @@ def show_mask_true_and_predict():
     images_train, images_valid, coco, classes = filterDataset(ANNOTATION_FILE_PATH, percent_valid=0)
     paths_m = os.path.join(MODEL_H5_PATH, 'model_1_0_10.h5')
     # model = load_model(paths_m)
-    model = load_model(paths_m, custom_objects={'dice_loss': dice_loss,
-                                                # 'jaccard_distance': jaccard_distance,
+    loss11111 = binary_weighted_cross_entropy(beta=1.0, is_logits=True)
+    iou1111 = MyMeanIOU(num_classes=12)
+
+    model = load_model(paths_m, custom_objects={'loss': loss11111,
+                                                'MyMeanIOU': iou1111,
                                                 # 'dice_coef': dice_coef,
                                                 # 'jaccard_coef': jaccard_coef
                                                 })
@@ -215,18 +224,18 @@ def show_mask_true_and_predict():
             predict9 = np.array(predict9)
 
             predict10 = pre[:, :, 9]
-            predict10 = (predict10 > 0.9).astype(np.float32)
+            predict10 = (predict10 > 0.7).astype(np.float32)
             predict10 = np.array(predict10)
 
             predict11 = pre[:, :, 10]
-            predict11 = (predict11 > 0.9).astype(np.float32)
+            predict11 = (predict11 > 0.7).astype(np.float32)
             predict11 = np.array(predict11)
 
             predict12 = pre[:, :, 11]
-            predict12 = (predict12 > 0.9).astype(np.float32)
+            predict12 = (predict12 > 0.7).astype(np.float32)
             predict12 = np.array(predict12)
 
-            a = pre[0, 0, :]
+            # a = pre[0, , :]
             # for isssssssssss in pre[]:
             #     print(isssssssssss)
             #     jsssdf =
@@ -303,12 +312,41 @@ def show_mask_true_and_predict():
         plt.show()
 
 
+palette = {
+    0: (0, 0, 0),
+    1: (0, 0, 0),
+    2: (0, 0, 0),
+    3: (0, 0, 0),
+    4: (0, 0, 0),
+    5: (0, 0, 0),
+    6: (0, 0, 0),
+    7: (0, 0, 0),
+    8: (0, 0, 0),
+    9: (255, 0, 0),
+    10: (0, 0, 255),
+    11: (0, 255, 0)
+}
+
+
+def mask2img(mask):
+    rows = mask.shape[0]
+    cols = mask.shape[1]
+    image = np.zeros((rows, cols, 3), dtype=np.uint8)
+    for j in range(rows):
+        for i in range(cols):
+            image[j, i] = palette[np.argmax(mask[j, i])]
+    return image
+
+
 def pppppppppp():
+    # return 0
     images_train, images_valid, coco, classes = filterDataset(ANNOTATION_FILE_PATH, percent_valid=0)
     paths_m = os.path.join(MODEL_H5_PATH, 'model_1_0_10.h5')
     # model = load_model(paths_m)
-    model = load_model(paths_m, custom_objects={'dice_loss': dice_loss,
-                                                # 'jaccard_distance': jaccard_distance,
+    loss11111 = binary_weighted_cross_entropy(beta=1.0, is_logits=True)
+    iou1111 = MyMeanIOU(num_classes=12)
+    model = load_model(paths_m, custom_objects={'loss': loss11111,
+                                                'MyMeanIOU': iou1111,
                                                 # 'dice_coef': dice_coef,
                                                 # 'jaccard_coef': jaccard_coef
                                                 })
@@ -319,41 +357,47 @@ def pppppppppp():
                                                       classes=classes,
                                                       coco=coco,
                                                       shuffle=False)
+    from tensorflow import expand_dims
 
     img_s, mask_s = train_generator_class.__getitem__(0)
+    img_one = img_s[0]
 
-    def create_mask(pred_mask):
-        pred_mask = tf.argmax(pred_mask, axis=-1)
-        pred_mask = tf.expand_dims(pred_mask, axis=-1)
-        return pred_mask
+    img_array_batch = expand_dims(img_one, axis=0)  # Create a batch
+    pre = model.predict(img_array_batch)
 
-    def display_sample(display_list):
-        plt.figure(figsize=(16, 16))
-        title = ['Input Image', 'True Mask', 'Predicted Mask']
-        for i in range(len(display_list)):
-            plt.subplot(1, len(display_list), i + 1)
-            plt.title(title[i])
-            plt.imshow(tf.keras.preprocessing.image.array_to_img(display_list[i]))
-            plt.axis('off')
-        plt.show()
-    def show_predictions():
-        one_img = img_s[0, :, :, :][tf.newaxis, ...]
-        print(one_img.shape)
-        print('----------------------111111111111')
-        prediction = model.predict(one_img)
-        pred_mask = create_mask(prediction)
-        print('----------------------33333333333333')
+    ssss = pre[0, :, :, :]
+    img = mask2img(ssss)
+    plt.imshow(img)
+    plt.show()
+    a = np.argmax(pre, axis=-1)
 
-        display_sample([img_s[0, :, :, :], mask_s[0, :, :, :]])
+    rows, cols = 4, 4
+    fig, ax = plt.subplots(rows, cols, sharex='col', sharey='row')
+    c_count = 0
+    r_count = 0
 
-    show_predictions()
-
+    for i, color in enumerate(['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12']):
+        if c_count == cols:
+            r_count += 1
+            c_count = 0
+        # ax[r_count, c_count].imshow(np.array(pre[0, :, :, i].astype(np.float32) > 0.9))
+        ax[r_count, c_count].imshow(np.array(pre[0, :, :, i].astype(np.float32) > 0.5))
+        ax[r_count, c_count].set_title(color)
+        ax[r_count, c_count].set_xticks(())
+        ax[r_count, c_count].set_yticks(())
+        c_count += 1
+    ax[3, 0].set_title('original')
+    ax[3, 0].imshow(img_one)
+    ax[3, 0].set_xticks(())
+    ax[3, 0].set_xticks(())
+    plt.show()
 
 
 def viz_model():
     images_train, images_valid, coco, classes = filterDataset(ANNOTATION_FILE_PATH, percent_valid=0)
     model = load_model(MODEL_H5_PATH, custom_objects={'dice_coef': dice_coef,
                                                       'bce_dice_loss': bce_dice_loss})
+
     train_generator_class = DataGeneratorFromCocoJson(batch_size=8,
                                                       subset='train',
                                                       input_image_size=(128, 128),
@@ -470,8 +514,8 @@ def test():
 
 
 if __name__ == "__main__":
-#     # test()
+    #     # test()
     pppppppppp()
-#     # main()
-#     # viz_model()
-#     show_mask_true_and_predict()
+    # main()
+    # viz_model()
+    # show_mask_true_and_predict()

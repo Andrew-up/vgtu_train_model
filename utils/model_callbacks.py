@@ -29,6 +29,7 @@ class callback_bce_dice_loss():
             save_best_only=True,
             save_weights_only=False,
             mode=self.mode,
+            monitor=self.monitor
         )
         return _checkpoint
 

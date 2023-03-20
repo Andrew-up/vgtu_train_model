@@ -1,8 +1,9 @@
-from keras_unet.models import custom_unet
-from utils.model_losses import bce_dice_loss, dice_coef, jaccard_distance, iou, jaccard_coef, dice_loss
-from utils.model_optimizers import SGD_loss
 import tensorflow as tf
 from keras import backend as K
+from keras_unet.models import custom_unet
+
+from utils.model_optimizers import SGD_loss
+from utils.model_losses import binary_weighted_cross_entropy
 
 
 def iou_coef(y_true, y_pred, smooth=1):
@@ -12,19 +13,22 @@ def iou_coef(y_true, y_pred, smooth=1):
     return iou
 
 
+class MyMeanIOU(tf.keras.metrics.MeanIoU):
+    def update_state(self, y_true, y_pred, sample_weight=None):
+        return super().update_state(tf.argmax(y_true, axis=-1), tf.argmax(y_pred, axis=-1), sample_weight)
+
 def unet_model(num_classes: int):
     model = custom_unet(
         input_shape=(128, 128, 3),
         use_batch_norm=True,
         num_classes=num_classes,
-        filters=16,
+        filters=32,
         num_layers=4,
-        dropout=0.1,
+        dropout=0.4,
         activation="relu",
         output_activation='sigmoid'
     )
-    LR = 1e-4
-    opt = tf.keras.optimizers.Adam(LR)
-    # model.compile(optimizer=SGD_loss(), loss=bce_dice_loss, metrics=[iou_coef, dice_coef])
-    model.compile(optimizer=opt, loss=dice_loss, metrics=[dice_coef, 'accuracy'])
+    iou = MyMeanIOU(num_classes=num_classes)
+    loss = binary_weighted_cross_entropy(beta=1.0, is_logits=True)
+    model.compile(optimizer=SGD_loss(), loss=loss, metrics=[iou, 'accuracy'])
     return model

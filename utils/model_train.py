@@ -22,8 +22,8 @@ def train_model(model: Sequential,
         update_model_history(model_history)
 
     callback = callback_bce_dice_loss(path=path_model,
-                                      monitor='val_loss',
-                                      mode='auto',
+                                      monitor='my_mean_iou',
+                                      mode='max',
                                       model_history=model_history)
 
     tb_callback = callback.tb_callback()

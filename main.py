@@ -8,7 +8,7 @@ from utils.DataGeneratorFromCocoJson import DataGeneratorFromCocoJson
 from utils.build_model import unet_model
 from utils.get_dataset_coco import filterDataset
 from utils.model_train import train_model
-from utils.vizualizators import vizualizator
+from utils.vizualizators import vizualizator, show_mask_true_and_predict
 from controller_vgtu_train.subprocess_train_model_controller import get_last_model_history, update_model_history
 from datetime import datetime
 import zipfile
@@ -23,10 +23,16 @@ def main():
     else:
         print(f'Удалено старых моделей h5 и zip архивов: {check_garbage_files_count}')
     timer = time.time()
-    images_train, images_valid, coco, classes = filterDataset(ANNOTATION_FILE_PATH, percent_valid=50)
+    images_train, images_valid, coco, classes = filterDataset(ANNOTATION_FILE_PATH, percent_valid=0)
 
     h, w, n_c = 128, 128, len(classes)
 
+
+
+
+
+    # return 0
+    # for i in range(10):
     train_generator_class = DataGeneratorFromCocoJson(batch_size=2,
                                                       subset='train',
                                                       input_image_size=(128, 128),
@@ -43,55 +49,37 @@ def main():
                                                       coco=coco,
                                                       shuffle=False)
 
-    # return 0
 
     img_list, img_mask = train_generator_class.__getitem__(0)
 
     print(f'h, w, n_c: {h, w, n_c}')
 
     vizualizator(img_list, img_mask)
-
+    # return 0
     # return 0
     # print(img_list.shape)
     # print(img_mask.shape)
     # return 0
     model = unet_model(len(classes))
-    # print(model.summary())
+    print(model.summary())
     # return 0
     path_model = os.path.join(MODEL_H5_PATH, MODEL_H5_FILE_NAME)
     model_history = get_last_model_history()
     if model_history:
         path_model = os.path.join(MODEL_H5_PATH, model_history.name_file)
-
+    print(path_model)
     history = train_model(path_model=path_model,
                           model=model,
-                          n_epoch=100,
+                          n_epoch=200,
                           batch_size=2,
                           dataset_train=train_generator_class,
                           dataset_valid=valid_generator_class,
                           dataset_size_train=len(images_train),
                           model_history=model_history)
 
-    plot_segm_history(history)
+    plot_segm_history(history, metrics=['my_mean_iou', 'val_my_mean_iou'])
 
-
-
-    # plt.plot(history.history['loss'])
-    # plt.plot(history.history['val_loss'])
-    # plt.title('model loss')
-    # plt.ylabel('loss')
-    # plt.xlabel('epoch')
-    # plt.legend(['train', 'val'], loc='upper left')
-    # plt.show()
-
-    # summarize history for IOU
-    # plt.plot(history.history['iou_coef'])
-    # plt.plot(history.history['val_iou_coef'])
-    # plt.title('iou_coef iou')
-    # plt.ylabel('iou')
-    # plt.xlabel('epoch')
-    # plt.legend(['train', 'val'], loc='upper left')
-    # plt.show()
+    show_mask_true_and_predict()
 
     path_zip = zipfile.ZipFile(f'{os.path.splitext(path_model)[0]}.zip', 'w')
     path_zip.write(path_model, arcname=f'{model_history.name_file}')
