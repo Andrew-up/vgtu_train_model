@@ -356,7 +356,7 @@ def pppppppppp():
                                                       image_list=images_train,
                                                       classes=classes,
                                                       coco=coco,
-                                                      shuffle=False)
+                                                      shuffle=True)
     from tensorflow import expand_dims
 
     img_s, mask_s = train_generator_class.__getitem__(0)
@@ -381,7 +381,7 @@ def pppppppppp():
             r_count += 1
             c_count = 0
         # ax[r_count, c_count].imshow(np.array(pre[0, :, :, i].astype(np.float32) > 0.9))
-        ax[r_count, c_count].imshow(np.array(pre[0, :, :, i].astype(np.float32) > 0.5))
+        ax[r_count, c_count].imshow(np.array(pre[0, :, :, i].astype(np.float32) > 0.4))
         ax[r_count, c_count].set_title(color)
         ax[r_count, c_count].set_xticks(())
         ax[r_count, c_count].set_yticks(())

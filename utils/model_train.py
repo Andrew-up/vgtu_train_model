@@ -12,7 +12,7 @@ from model.model_history import ModelHistory
 def train_model(model: Sequential,
                 n_epoch,
                 path_model,
-                batch_size=2,
+                batch_size=8,
                 dataset_train=None,
                 dataset_valid=None,
                 dataset_size_train=0,
@@ -32,16 +32,20 @@ def train_model(model: Sequential,
     print_test = callback.print_test()
     print('dataset_size_train: ' + str(dataset_size_train))
     steps_per_epoch = int(dataset_size_train // batch_size)
-    validation_steps = 2
+    validation_steps = len(dataset_valid) // batch_size
+    print(f'steps_per_epoch: {steps_per_epoch}')
+    print(f'validation_steps: {validation_steps}')
+
 
     history = model.fit(
         dataset_train,
         validation_data=dataset_valid,
         # validation_steps=validation_steps,
-        # steps_per_epoch=steps_per_epoch,
+        steps_per_epoch=steps_per_epoch,
         epochs=n_epoch,
         batch_size=batch_size,
         callbacks=[tb_callback, reduce_lr, checkpoint, print_test],
         verbose=True,
+        # validation_split=0.3
     )
     return history

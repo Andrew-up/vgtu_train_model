@@ -5,7 +5,10 @@ from keras_unet.models import custom_unet
 from utils.model_optimizers import SGD_loss
 from utils.model_losses import binary_weighted_cross_entropy
 
-
+def dice_loss(y_true, y_pred):
+    numerator = tf.reduce_sum(y_true * y_pred)
+    denominator = tf.reduce_sum(y_true * y_true) + tf.reduce_sum(y_pred * y_pred) - tf.reduce_sum(y_true * y_pred)
+    return 1 - numerator / denominator
 def iou_coef(y_true, y_pred, smooth=1):
     intersection = K.sum(K.abs(y_true * y_pred), axis=[1, 2, 3])
     union = K.sum(y_true, [1, 2, 3]) + K.sum(y_pred, [1, 2, 3]) - intersection
@@ -24,11 +27,11 @@ def unet_model(num_classes: int):
         num_classes=num_classes,
         filters=32,
         num_layers=4,
-        dropout=0.4,
+        dropout=0.1,
         activation="relu",
         output_activation='sigmoid'
     )
     iou = MyMeanIOU(num_classes=num_classes)
-    loss = binary_weighted_cross_entropy(beta=1.0, is_logits=True)
+    loss = binary_weighted_cross_entropy(beta=0.9, is_logits=True)
     model.compile(optimizer=SGD_loss(), loss=loss, metrics=[iou, 'accuracy'])
     return model

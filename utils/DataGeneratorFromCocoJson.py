@@ -47,6 +47,7 @@ class DataGeneratorFromCocoJson(tf.keras.utils.Sequence):
         # print(image_id)
         annIds = self.coco.getAnnIds(image_id, catIds=catIds, iscrowd=None)
         anns = self.coco.loadAnns(annIds)
+        print(anns)
         cats = self.coco.loadCats(catIds)
         train_mask = np.zeros(self.input_image_size, dtype=np.uint8)
         for a in range(len(anns)):
@@ -55,9 +56,10 @@ class DataGeneratorFromCocoJson(tf.keras.utils.Sequence):
             # print('=============')
             className = self.getClassName(anns[a]['category_id'], cats)
             pixel_value = self.classes.index(className) + 1
+            print('=============')
             new_mask = cv2.resize(self.coco.annToMask(
                 anns[a]) * pixel_value, self.input_image_size)
-            # print('--------------------')
+            print('--------------------')
             train_mask = np.maximum(new_mask, train_mask)
             # train_mask = new_mask / 255.0
         # plt.imshow(train_mask)
@@ -97,7 +99,7 @@ class DataGeneratorFromCocoJson(tf.keras.utils.Sequence):
     def getImagePathByCocoId(self, image_id):
         image = self.coco.loadImgs([image_id])[0]
         imagePath = DATASET_PATH +'/'+ image['file_name']
-        # print(imagePath)
+        print(imagePath)
         return imagePath
 
     def flip_random(self, img, mask):
@@ -123,25 +125,29 @@ class DataGeneratorFromCocoJson(tf.keras.utils.Sequence):
 
     def __getitem__(self, index):
         X = np.empty((self.batch_size, 128, 128, 3))
-        y = np.empty((self.batch_size, 128, 128, 12))
+        y = np.empty((self.batch_size, 128, 128, 1))
         indexes = self.indexes[index * self.batch_size:(index + 1) * self.batch_size]
         # print(range(len(indexes)))
-
+        # print('11111111111111111111111111111111')
         # return 0
         for i in range(len(indexes)):
             value = indexes[i]
             img_info = self.image_list[value]
             # w = img_info['height']
             # h = img_info['width']
-            X[i, ] = self.getImage(self.getImagePathByCocoId(img_info['id']))
+            # X[i, ] = self.getImage(self.getImagePathByCocoId(img_info['id']))
+            img = self.getImage(self.getImagePathByCocoId(img_info['id']))
             # print(X.shape)
             # print('______________________')
             # plt.imshow(self.getImage(getImagePathById(img_info['id'])))
             mask_train = self.getLevelsMask(img_info['id'])
+            X[i, ] = img
             # X[i, ], mask_train = self.flip_random(img, mask_train)
             # X[i, ], mask_train = self.rot90_random(X[i, ], mask_train)
             # X[i, ] = tf.image.random_brightness((X[i, ]*255).astype(np.uint8), 0.2)
             # X[i, ] = tf.image.random_contrast(X[i, ], 0.5, 0.8) / 255
+
+
 
 
             # plt.imshow(X[i, ])

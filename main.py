@@ -2,6 +2,7 @@ import os.path
 import time
 
 import matplotlib.pyplot as plt
+import numpy as np
 
 from definitions import MODEL_H5_PATH, ANNOTATION_FILE_PATH, MODEL_H5_FILE_NAME
 from utils.DataGeneratorFromCocoJson import DataGeneratorFromCocoJson
@@ -23,25 +24,14 @@ def main():
     else:
         print(f'Удалено старых моделей h5 и zip архивов: {check_garbage_files_count}')
     timer = time.time()
-    images_train, images_valid, coco, classes = filterDataset(ANNOTATION_FILE_PATH, percent_valid=0)
+    images_train, images_valid, coco, classes = filterDataset(ANNOTATION_FILE_PATH, percent_valid=30)
 
     h, w, n_c = 128, 128, len(classes)
 
-
-
-
-
     # return 0
     # for i in range(10):
-    train_generator_class = DataGeneratorFromCocoJson(batch_size=2,
-                                                      subset='train',
-                                                      input_image_size=(128, 128),
-                                                      image_list=images_train,
-                                                      classes=classes,
-                                                      coco=coco,
-                                                      shuffle=False)
 
-    valid_generator_class = DataGeneratorFromCocoJson(batch_size=2,
+    valid_generator_class = DataGeneratorFromCocoJson(batch_size=8,
                                                       subset='train',
                                                       input_image_size=(128, 128),
                                                       image_list=images_valid,
@@ -49,12 +39,18 @@ def main():
                                                       coco=coco,
                                                       shuffle=False)
 
-
-    img_list, img_mask = train_generator_class.__getitem__(0)
+    train_generator_class = DataGeneratorFromCocoJson(batch_size=8,
+                                                      subset='train',
+                                                      input_image_size=(128, 128),
+                                                      image_list=images_train,
+                                                      classes=classes,
+                                                      coco=coco,
+                                                      shuffle=False)
 
     print(f'h, w, n_c: {h, w, n_c}')
-
-    vizualizator(img_list, img_mask)
+    i, m = train_generator_class.__getitem__(0)
+    # return 0
+    # vizualizator(i, m)
     # return 0
     # return 0
     # print(img_list.shape)
@@ -70,7 +66,7 @@ def main():
     print(path_model)
     history = train_model(path_model=path_model,
                           model=model,
-                          n_epoch=200,
+                          n_epoch=10,
                           batch_size=2,
                           dataset_train=train_generator_class,
                           dataset_valid=valid_generator_class,
