@@ -1,3 +1,4 @@
+import os.path
 import random
 
 import matplotlib.pyplot as plt
@@ -12,7 +13,8 @@ from definitions import DATASET_PATH
 
 class DataGeneratorFromCocoJson(tf.keras.utils.Sequence):
     def __init__(self, batch_size=8, subset="train", image_list=[], classes=[], input_image_size=(128, 128),
-                 shuffle=False, coco: COCO = None):
+                 shuffle=False, coco: COCO = None,
+                 path_folder=None):
 
         super().__init__()
         self.subset = subset
@@ -27,6 +29,7 @@ class DataGeneratorFromCocoJson(tf.keras.utils.Sequence):
         self.catIds = catIDs
         self.cats = self.coco.loadCats(catIDs)
         self.imgIds = self.coco.getImgIds()
+        self.path_folder_image = path_folder
         self.shuffle = shuffle
         self.on_epoch_end()
 
@@ -47,7 +50,7 @@ class DataGeneratorFromCocoJson(tf.keras.utils.Sequence):
         # print(image_id)
         annIds = self.coco.getAnnIds(image_id, catIds=catIds, iscrowd=None)
         anns = self.coco.loadAnns(annIds)
-        print(anns)
+        # print(anns)
         cats = self.coco.loadCats(catIds)
         train_mask = np.zeros(self.input_image_size, dtype=np.uint8)
         for a in range(len(anns)):
@@ -56,10 +59,11 @@ class DataGeneratorFromCocoJson(tf.keras.utils.Sequence):
             # print('=============')
             className = self.getClassName(anns[a]['category_id'], cats)
             pixel_value = self.classes.index(className) + 1
-            print('=============')
+            print(self.coco.annToMask(anns[a]))
+
             new_mask = cv2.resize(self.coco.annToMask(
                 anns[a]) * pixel_value, self.input_image_size)
-            print('--------------------')
+
             train_mask = np.maximum(new_mask, train_mask)
             # train_mask = new_mask / 255.0
         # plt.imshow(train_mask)
@@ -99,7 +103,11 @@ class DataGeneratorFromCocoJson(tf.keras.utils.Sequence):
     def getImagePathByCocoId(self, image_id):
         image = self.coco.loadImgs([image_id])[0]
         imagePath = DATASET_PATH +'/'+ image['file_name']
-        print(imagePath)
+        if self.path_folder_image is not None:
+            imagePath = f'{DATASET_PATH}/{self.path_folder_image}/{image["file_name"]}'
+            # print('folder is not none')
+            # print(imagePath)
+        # print(imagePath)
         return imagePath
 
     def flip_random(self, img, mask):
@@ -125,7 +133,7 @@ class DataGeneratorFromCocoJson(tf.keras.utils.Sequence):
 
     def __getitem__(self, index):
         X = np.empty((self.batch_size, 128, 128, 3))
-        y = np.empty((self.batch_size, 128, 128, 1))
+        y = np.empty((self.batch_size, 128, 128, len(self.classes)))
         indexes = self.indexes[index * self.batch_size:(index + 1) * self.batch_size]
         # print(range(len(indexes)))
         # print('11111111111111111111111111111111')
@@ -140,9 +148,10 @@ class DataGeneratorFromCocoJson(tf.keras.utils.Sequence):
             # print(X.shape)
             # print('______________________')
             # plt.imshow(self.getImage(getImagePathById(img_info['id'])))
+            # print('sssssssssssss')
             mask_train = self.getLevelsMask(img_info['id'])
             X[i, ] = img
-            # X[i, ], mask_train = self.flip_random(img, mask_train)
+            X[i, ], mask_train = self.flip_random(img, mask_train)
             # X[i, ], mask_train = self.rot90_random(X[i, ], mask_train)
             # X[i, ] = tf.image.random_brightness((X[i, ]*255).astype(np.uint8), 0.2)
             # X[i, ] = tf.image.random_contrast(X[i, ], 0.5, 0.8) / 255

@@ -16,13 +16,14 @@ def train_model(model: Sequential,
                 dataset_train=None,
                 dataset_valid=None,
                 dataset_size_train=0,
-                model_history: ModelHistory = None):
+                model_history: ModelHistory = None,
+                monitor='my_mean_iou'):
     if model_history:
         model_history.total_epochs = n_epoch
         update_model_history(model_history)
 
     callback = callback_bce_dice_loss(path=path_model,
-                                      monitor='my_mean_iou',
+                                      monitor=monitor,
                                       mode='max',
                                       model_history=model_history)
 
@@ -35,7 +36,7 @@ def train_model(model: Sequential,
     validation_steps = len(dataset_valid) // batch_size
     print(f'steps_per_epoch: {steps_per_epoch}')
     print(f'validation_steps: {validation_steps}')
-
+    print('+++++++++++++++++++++++++++++++++++')
 
     history = model.fit(
         dataset_train,

@@ -133,6 +133,10 @@ def convert_to_logits(y_pred: tf.Tensor) -> tf.Tensor:
 
     return K.log(y_pred / (1 - y_pred))
 
+def dice_loss(y_true, y_pred):
+    numerator = tf.reduce_sum(y_true * y_pred)
+    denominator = tf.reduce_sum(y_true * y_true) + tf.reduce_sum(y_pred * y_pred) - tf.reduce_sum(y_true * y_pred)
+    return 1 - numerator / denominator
 
 def binary_weighted_cross_entropy(beta: float, is_logits: bool = False) -> Callable[[tf.Tensor, tf.Tensor], tf.Tensor]:
     """

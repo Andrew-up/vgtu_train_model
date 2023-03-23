@@ -10,56 +10,35 @@ from keras.models import Model, load_model
 import tensorflow as tf
 from keras.utils import img_to_array
 
-from definitions import ANNOTATION_FILE_PATH, DATASET_PATH, MODEL_H5_PATH
+from definitions import ANNOTATION_FILE_PATH, DATASET_PATH, MODEL_H5_PATH, ANNOTATION_FILE_PATH_TRAIN, \
+    ANNOTATION_FILE_PATH_TEST, ANNOTATION_FILE_PATH_VALID
 from utils.DataGeneratorFromCocoJson import DataGeneratorFromCocoJson
 from utils.get_dataset_coco import filterDataset
 from utils.model_losses import dice_coef, bce_dice_loss, jaccard_distance, iou, jaccard_coef, dice_coef_loss, \
-    binary_weighted_cross_entropy
+    binary_weighted_cross_entropy, dice_loss
+
 
 class MyMeanIOU(tf.keras.metrics.MeanIoU):
     def update_state(self, y_true, y_pred, sample_weight=None):
         return super().update_state(tf.argmax(y_true, axis=-1), tf.argmax(y_pred, axis=-1), sample_weight)
 
-def vizualizator(list_images, list_masks):
+
+def vizualizator(list_images, list_masks, classes):
     x, y = list_images, list_masks
     fig = plt.figure(figsize=(50, 40))
     gs = gridspec.GridSpec(nrows=len(x), ncols=2)
     colors = ['#705335', '#25221B', '#E63244', '#EC7C26', '#474B4E', '#D84B20', '#8F8F8F', '#6D6552', '#4E5754',
               '#6C4675', '#969992', '#9E9764']
-    labels = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'треугольник', 'квадрат', 'круг']
+    labels = classes
     patches = [mpatches.Patch(
         color=colors[i], label=f"{labels[i]}") for i in range(len(labels))]
 
-    cmap1 = mpl.colors.ListedColormap(colors[0])
-    cmap2 = mpl.colors.ListedColormap(colors[1])
-    cmap3 = mpl.colors.ListedColormap(colors[2])
-    cmap4 = mpl.colors.ListedColormap(colors[3])
-    cmap5 = mpl.colors.ListedColormap(colors[4])
-    cmap6 = mpl.colors.ListedColormap(colors[5])
-    cmap7 = mpl.colors.ListedColormap(colors[6])
-    cmap8 = mpl.colors.ListedColormap(colors[7])
-    cmap9 = mpl.colors.ListedColormap(colors[8])
-    cmap10 = mpl.colors.ListedColormap(colors[9])
-    cmap11 = mpl.colors.ListedColormap(colors[10])
-    cmap12 = mpl.colors.ListedColormap(colors[11])
+
     flag = False
-    for i in range(0, 2):
+    for i in range(0, len(list_images)):
 
         images, mask = x[i], y[i]
         sample_img = images
-        mask1 = mask[:, :, 0]
-        mask2 = mask[:, :, 1]
-        mask3 = mask[:, :, 2]
-        mask4 = mask[:, :, 3]
-        mask5 = mask[:, :, 4]
-        mask6 = mask[:, :, 5]
-        mask7 = mask[:, :, 6]
-        mask8 = mask[:, :, 7]
-        mask9 = mask[:, :, 8]
-        mask10 = mask[:, :, 9]
-        mask11 = mask[:, :, 10]
-        mask12 = mask[:, :, 11]
-
         ax0 = fig.add_subplot(gs[i, 0])
         im = ax0.imshow(sample_img)
 
@@ -72,34 +51,15 @@ def vizualizator(list_images, list_masks):
                        title='Mask Labels', title_fontsize=14, edgecolor="black", facecolor='#c5c6c7')
 
         l0 = ax1.imshow(sample_img)
-        l1 = ax1.imshow(np.ma.masked_where(
-            mask1 == False, mask1), cmap=cmap1, alpha=1)
-        l2 = ax1.imshow(np.ma.masked_where(
-            mask2 == False, mask2), cmap=cmap2, alpha=1)
-        l3 = ax1.imshow(np.ma.masked_where(
-            mask3 == False, mask3), cmap=cmap3, alpha=1)
-        l4 = ax1.imshow(np.ma.masked_where(
-            mask4 == False, mask4), cmap=cmap4, alpha=1)
-        l5 = ax1.imshow(np.ma.masked_where(
-            mask5 == False, mask5), cmap=cmap5, alpha=1)
-        l6 = ax1.imshow(np.ma.masked_where(
-            mask6 == False, mask6), cmap=cmap6, alpha=1)
-        l7 = ax1.imshow(np.ma.masked_where(
-            mask7 == False, mask7), cmap=cmap7, alpha=1)
-        l8 = ax1.imshow(np.ma.masked_where(
-            mask8 == False, mask8), cmap=cmap8, alpha=1)
-        l9 = ax1.imshow(np.ma.masked_where(
-            mask9 == False, mask9), cmap=cmap9, alpha=1)
-        l10 = ax1.imshow(np.ma.masked_where(
-            mask10 == False, mask10), cmap=cmap10, alpha=1)
-        l11 = ax1.imshow(np.ma.masked_where(
-            mask11 == False, mask11), cmap=cmap11, alpha=1)
-        l12 = ax1.imshow(np.ma.masked_where(
-            mask12 == False, mask12), cmap=cmap12, alpha=1)
-        _ = [ax.set_axis_off() for ax in [ax0, ax1]]
+        listMasks = []
+        for i in range(len(mask[0, 0, :])):
+            mask_one = mask[:, :, i]
+            l = ax1.imshow(np.ma.masked_where(
+                mask_one == False, mask_one), cmap=mpl.colors.ListedColormap(colors[i]), alpha=1)
+            listMasks.append(l)
 
-        #
-        colors = [im.cmap(im.norm(1)) for im in [l1, l2, l3, l4, l5, l6, l7, l8, l9, l10, l11, l12]]
+        colors = [im.cmap(im.norm(1)) for im in listMasks]
+
     plt.subplots_adjust(left=0.11, bottom=0.08, right=0.3,
                         top=0.92, wspace=0.01, hspace=0.08)
     plt.show()
@@ -109,20 +69,24 @@ from keras import backend as K
 
 
 def show_mask_true_and_predict():
-    images_train, images_valid, coco, classes = filterDataset(ANNOTATION_FILE_PATH, percent_valid=0)
+    images_train, images_valid, coco, classes = filterDataset(ANNOTATION_FILE_PATH_TEST,
+                                                              percent_valid=0,
+                                                              path_folder='test'
+                                                              )
     paths_m = os.path.join(MODEL_H5_PATH, 'model_1_0_10.h5')
-    # model = load_model(paths_m)
-    loss11111 = binary_weighted_cross_entropy(beta=1.0, is_logits=True)
-    iou1111 = MyMeanIOU(num_classes=12)
 
-    model = load_model(paths_m, custom_objects={'loss': loss11111,
+    iou1111 = MyMeanIOU(num_classes=len(classes),
+                        ignore_class=0
+                        )
+    model = load_model(paths_m, custom_objects={'dice_loss': dice_loss,
                                                 'MyMeanIOU': iou1111,
                                                 # 'dice_coef': dice_coef,
                                                 # 'jaccard_coef': jaccard_coef
                                                 })
     # model = load_model(model)
-    for i in range(1):
-        train_generator_class = DataGeneratorFromCocoJson(batch_size=4,
+    for j in range(1):
+        train_generator_class = DataGeneratorFromCocoJson(batch_size=6,
+                                                          path_folder='test',
                                                           subset='train',
                                                           input_image_size=(128, 128),
                                                           image_list=images_train,
@@ -131,118 +95,21 @@ def show_mask_true_and_predict():
                                                           shuffle=False)
 
         img_s, mask_s = train_generator_class.__getitem__(0)
-        # print(len(img_s))
-        # plt.imshow(img_s[1, :, :, :])
-        # plt.show()
-        # print(img_s.shape)
         res = model.predict(img_s)
 
         fig = plt.figure(figsize=(10, 25))
         gs = gridspec.GridSpec(nrows=len(img_s), ncols=4)
-        colors = ['#705335', '#25221B', '#E63244', '#EC7C26', '#474B4E', '#D84B20', '#8F8F8F', '#6D6552', '#4E5754',
-                  '#6C4675', '#969992',
-                  '#9E9764']
-        labels = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'треугольник', 'квадрат', 'круг']
+        colors = ['#0000ff', '#ff0066', '#66ff33', '#ffff00', '#ffccff', '#D84B20', '#8F8F8F', '#6D6552', '#4E5754', '#6C4675', '#969992', '#9E9764', '#969992', '#9E9764']
         patches = [mpatches.Patch(
-            color=colors[i], label=f"{labels[i]}") for i in range(len(labels))]
-
-        cmap1 = mpl.colors.ListedColormap(colors[0])
-        cmap2 = mpl.colors.ListedColormap(colors[1])
-        cmap3 = mpl.colors.ListedColormap(colors[2])
-        cmap4 = mpl.colors.ListedColormap(colors[3])
-        cmap5 = mpl.colors.ListedColormap(colors[4])
-        cmap6 = mpl.colors.ListedColormap(colors[5])
-        cmap7 = mpl.colors.ListedColormap(colors[6])
-        cmap8 = mpl.colors.ListedColormap(colors[7])
-        cmap9 = mpl.colors.ListedColormap(colors[8])
-        cmap10 = mpl.colors.ListedColormap(colors[9])
-        cmap11 = mpl.colors.ListedColormap(colors[10])
-        cmap12 = mpl.colors.ListedColormap(colors[11])
+            color=colors[i], label=f"{classes[i]}") for i in range(len(classes))]
 
         flag = False
-        for i in range(0, 4):
-            # list_predict = list()
-            # list_predict.append(np.sum(res[0, :, :, 0]))
-            # list_predict.append(np.sum(res[0, :, :, 1]))
-            # list_predict.append(np.sum(res[0, :, :, 2]))
-            # max_value = max(list_predict)
-            # max_index = list_predict.index(max_value)
+        for i in range(0, len(img_s)):
 
             images, mask = img_s[i], mask_s[i]
             sample_img = images
-            # print(sample_img.shape)
-            # print(type(sample_img))
-            # print()
-            mask1 = mask[:, :, 0]
-            mask2 = mask[:, :, 1]
-            mask3 = mask[:, :, 2]
-            mask4 = mask[:, :, 3]
-            mask5 = mask[:, :, 4]
-            mask6 = mask[:, :, 5]
-            mask7 = mask[:, :, 6]
-            mask8 = mask[:, :, 7]
-            mask9 = mask[:, :, 8]
-            mask10 = mask[:, :, 9]
-            mask11 = mask[:, :, 10]
-            mask12 = mask[:, :, 11]
-
-            pre = res[i]
-            predict1 = pre[:, :, 0]
-            predict1 = (predict1 > 0.9).astype(np.float32)
-            predict1 = np.array(predict1)
-
-            predict2 = pre[:, :, 1]
-            predict2 = (predict2 > 0.9).astype(np.float32)
-            predict2 = np.array(predict2)
-
-            predict3 = pre[:, :, 2]
-            predict3 = (predict3 > 0.9).astype(np.float32)
-            predict3 = np.array(predict3)
-
-            predict4 = pre[:, :, 3]
-            predict4 = (predict4 > 0.9).astype(np.float32)
-            predict4 = np.array(predict4)
-
-            predict5 = pre[:, :, 4]
-            predict5 = (predict5 > 0.9).astype(np.float32)
-            predict5 = np.array(predict5)
-
-            predict6 = pre[:, :, 5]
-            predict6 = (predict6 > 0.9).astype(np.float32)
-            predict6 = np.array(predict6)
-
-            predict7 = pre[:, :, 6]
-            predict7 = (predict7 > 0.9).astype(np.float32)
-            predict7 = np.array(predict7)
-
-            predict8 = pre[:, :, 7]
-            predict8 = (predict8 > 0.9).astype(np.float32)
-            predict8 = np.array(predict8)
-
-            predict9 = pre[:, :, 8]
-            predict9 = (predict9 > 0.9).astype(np.float32)
-            predict9 = np.array(predict9)
-
-            predict10 = pre[:, :, 9]
-            predict10 = (predict10 > 0.7).astype(np.float32)
-            predict10 = np.array(predict10)
-
-            predict11 = pre[:, :, 10]
-            predict11 = (predict11 > 0.7).astype(np.float32)
-            predict11 = np.array(predict11)
-
-            predict12 = pre[:, :, 11]
-            predict12 = (predict12 > 0.7).astype(np.float32)
-            predict12 = np.array(predict12)
-
-            # a = pre[0, , :]
-            # for isssssssssss in pre[]:
-            #     print(isssssssssss)
-            #     jsssdf =
-
             ax0 = fig.add_subplot(gs[i, 0])
             im = ax0.imshow((sample_img * 255).astype(np.uint8))
-
             ax1 = fig.add_subplot(gs[i, 1])
             ax2 = fig.add_subplot(gs[i, 2])
             if (flag == False):
@@ -253,61 +120,36 @@ def show_mask_true_and_predict():
                 plt.legend(handles=patches, bbox_to_anchor=(1.1, 0.65), loc=2, borderaxespad=0.4, fontsize=14,
                            title='Mask Labels', title_fontsize=14, edgecolor="black", facecolor='#c5c6c7')
 
+
             l0 = ax1.imshow(sample_img)
-            l1 = ax1.imshow(np.ma.masked_where(
-                mask1 == False, mask1), cmap=cmap1, alpha=1)
-            l2 = ax1.imshow(np.ma.masked_where(
-                mask2 == False, mask2), cmap=cmap2, alpha=1)
-            l3 = ax1.imshow(np.ma.masked_where(
-                mask3 == False, mask3), cmap=cmap3, alpha=1)
-            l4 = ax1.imshow(np.ma.masked_where(
-                mask4 == False, mask4), cmap=cmap4, alpha=1)
-            l5 = ax1.imshow(np.ma.masked_where(
-                mask5 == False, mask5), cmap=cmap5, alpha=1)
-            l6 = ax1.imshow(np.ma.masked_where(
-                mask6 == False, mask6), cmap=cmap6, alpha=1)
-            l7 = ax1.imshow(np.ma.masked_where(
-                mask7 == False, mask7), cmap=cmap7, alpha=1)
-            l8 = ax1.imshow(np.ma.masked_where(
-                mask8 == False, mask8), cmap=cmap8, alpha=1)
-            l9 = ax1.imshow(np.ma.masked_where(
-                mask9 == False, mask9), cmap=cmap9, alpha=1)
-            l10 = ax1.imshow(np.ma.masked_where(
-                mask10 == False, mask10), cmap=cmap10, alpha=1)
-            l11 = ax1.imshow(np.ma.masked_where(
-                mask11 == False, mask11), cmap=cmap11, alpha=1)
-            l12 = ax1.imshow(np.ma.masked_where(
-                mask12 == False, mask12), cmap=cmap12, alpha=1)
-            _ = [ax.set_axis_off() for ax in [ax0, ax1]]
-
+            listMasks = []
+            listMasksPredict = []
             l0 = ax2.imshow(sample_img)
-            # l1 = ax2.imshow(np.ma.masked_where(
-            #     predict1 == False, predict1), cmap=cmap1, alpha=0.4)
-            # l2 = ax2.imshow(np.ma.masked_where(
-            #     predict2 == False, predict2), cmap=cmap2, alpha=0.4)
-            # l3 = ax2.imshow(np.ma.masked_where(
-            #     predict3 == False, predict3), cmap=cmap3, alpha=0.4)
-            # l4 = ax2.imshow(np.ma.masked_where(
-            #     predict4 == False, predict4), cmap=cmap4, alpha=0.4)
-            # l5 = ax2.imshow(np.ma.masked_where(
-            #     predict5 == False, predict5), cmap=cmap5, alpha=0.4)
-            # l6 = ax2.imshow(np.ma.masked_where(
-            #     predict6 == False, predict6), cmap=cmap6, alpha=0.4)
-            # l7 = ax2.imshow(np.ma.masked_where(
-            #     predict7 == False, predict7), cmap=cmap7, alpha=0.4)
-            # l8 = ax2.imshow(np.ma.masked_where(
-            #     predict8 == False, predict8), cmap=cmap8, alpha=0.4)
-            # l9 = ax2.imshow(np.ma.masked_where(
-            #     predict9 == False, predict9), cmap=cmap9, alpha=0.4)
-            l10 = ax2.imshow(np.ma.masked_where(
-                predict10 == False, predict10), cmap=cmap10, alpha=1)
-            l11 = ax2.imshow(np.ma.masked_where(
-                predict11 == False, predict11), cmap=cmap11, alpha=0.8)
-            l12 = ax2.imshow(np.ma.masked_where(
-                predict12 == False, predict12), cmap=cmap12, alpha=0.5)
+            for m in range(len(mask[0, 0, :])):
+                mask_one = mask[:, :, m]
+                l = ax1.imshow(np.ma.masked_where(
+                    mask_one == False, mask_one), cmap=mpl.colors.ListedColormap(colors[m]), alpha=1)
+                listMasks.append(l)
+
+
+            pre = res[i]
+            print(pre.shape)
+            for i in range(len(pre[0, 0, :])):
+                # print(i)
+                res_one = (pre[:, :, i] > 0.5).astype(np.float32)
+                res_one = np.array(res_one)
+                pass
+                l = ax2.imshow(np.ma.masked_where(
+                    res_one == False, res_one), cmap=mpl.colors.ListedColormap(colors[i]), alpha=1)
+                listMasksPredict.append(l)
+
+
+
             _ = [ax.set_axis_off() for ax in [ax0, ax1]]
 
-            colors = [im.cmap(im.norm(1)) for im in [l1, l2, l3, l4, l5, l6, l7, l8, l9, l10, l11, l12]]
+            colors = [im.cmap(im.norm(1)) for im in listMasks]
+            colors2 = [im.cmap(im.norm(1)) for im in listMasksPredict]
+            # colors = [im.cmap(im.norm(1)) for im in [l1, l2, l3, l4, l5, l6, l7, l8, l9, l10, l11, l12]]
 
         plt.show()
 
@@ -338,19 +180,32 @@ def mask2img(mask):
     return image
 
 
+def iou_coef(y_true, y_pred, smooth=1):
+    intersection = K.sum(K.abs(y_true * y_pred), axis=[1, 2, 3])
+    union = K.sum(y_true, [1, 2, 3]) + K.sum(y_pred, [1, 2, 3]) - intersection
+    iou = K.mean((intersection + smooth) / (union + smooth), axis=0)
+    return iou
+
+
 def pppppppppp():
     # return 0
-    images_train, images_valid, coco, classes = filterDataset(ANNOTATION_FILE_PATH, percent_valid=0)
+    images_train, images_valid, coco, classes = filterDataset(ANNOTATION_FILE_PATH_TEST,
+                                                              percent_valid=0,
+                                                              path_folder='test'
+                                                              )
     paths_m = os.path.join(MODEL_H5_PATH, 'model_1_0_10.h5')
-    # model = load_model(paths_m)
-    loss11111 = binary_weighted_cross_entropy(beta=1.0, is_logits=True)
-    iou1111 = MyMeanIOU(num_classes=12)
-    model = load_model(paths_m, custom_objects={'loss': loss11111,
+
+    iou1111 = MyMeanIOU(num_classes=len(classes)
+                        # , ignore_class=0
+                        )
+    model = load_model(paths_m, custom_objects={'dice_loss': dice_loss,
                                                 'MyMeanIOU': iou1111,
                                                 # 'dice_coef': dice_coef,
                                                 # 'jaccard_coef': jaccard_coef
                                                 })
-    train_generator_class = DataGeneratorFromCocoJson(batch_size=4,
+
+    train_generator_class = DataGeneratorFromCocoJson(batch_size=8,
+                                                      path_folder='test',
                                                       subset='train',
                                                       input_image_size=(128, 128),
                                                       image_list=images_train,
@@ -360,37 +215,38 @@ def pppppppppp():
     from tensorflow import expand_dims
 
     img_s, mask_s = train_generator_class.__getitem__(0)
-    img_one = img_s[0]
+    # predddd = model.predict(img_s)
+    # m = tf.keras.metrics.MeanIoU(num_classes=5 - 1)
+    # m.update_state(y_true=mask_s, y_pred=predddd)
+    # print('result iou: ' + str(m.result().numpy()))
 
-    img_array_batch = expand_dims(img_one, axis=0)  # Create a batch
-    pre = model.predict(img_array_batch)
+    for i in range(len(img_s)):
+        img_one = img_s[i]
+        img_array_batch = expand_dims(img_one, axis=0)  # Create a batch
+        pre = model.predict(img_array_batch)
 
-    ssss = pre[0, :, :, :]
-    img = mask2img(ssss)
-    plt.imshow(img)
-    plt.show()
-    a = np.argmax(pre, axis=-1)
+        rows, cols = 5, 5
+        fig, ax = plt.subplots(rows, cols, sharex='col', sharey='row')
+        c_count = 0
+        r_count = 0
+        num_class_model = len(pre[0, 0, 0, :])
+        # d = classes
 
-    rows, cols = 4, 4
-    fig, ax = plt.subplots(rows, cols, sharex='col', sharey='row')
-    c_count = 0
-    r_count = 0
-
-    for i, color in enumerate(['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12']):
-        if c_count == cols:
-            r_count += 1
-            c_count = 0
-        # ax[r_count, c_count].imshow(np.array(pre[0, :, :, i].astype(np.float32) > 0.9))
-        ax[r_count, c_count].imshow(np.array(pre[0, :, :, i].astype(np.float32) > 0.4))
-        ax[r_count, c_count].set_title(color)
-        ax[r_count, c_count].set_xticks(())
-        ax[r_count, c_count].set_yticks(())
-        c_count += 1
-    ax[3, 0].set_title('original')
-    ax[3, 0].imshow(img_one)
-    ax[3, 0].set_xticks(())
-    ax[3, 0].set_xticks(())
-    plt.show()
+        for J in range(num_class_model):
+            if c_count == cols:
+                r_count += 1
+                c_count = 0
+            # ax[r_count, c_count].imshow(np.array(pre[0, :, :, i].astype(np.float32) > 0.9))
+            ax[r_count, c_count].imshow(np.array(pre[0, :, :, J].astype(np.float32) > 0.5))
+            ax[r_count, c_count].set_title(classes[J])
+            ax[r_count, c_count].set_xticks(())
+            ax[r_count, c_count].set_yticks(())
+            c_count += 1
+        ax[4, 0].set_title('original')
+        ax[4, 0].imshow(img_one)
+        ax[4, 0].set_xticks(())
+        ax[4, 0].set_xticks(())
+        plt.show()
 
 
 def viz_model():
@@ -404,7 +260,7 @@ def viz_model():
                                                       image_list=images_train,
                                                       classes=classes,
                                                       coco=coco,
-                                                      shuffle=True)
+                                                      shuffle=False)
 
     # m = tf.keras.metrics.IoU()
     # m.update_state(train_generator_class, Y_pred)
@@ -518,4 +374,4 @@ if __name__ == "__main__":
     pppppppppp()
     # main()
     # viz_model()
-    # show_mask_true_and_predict()
+    show_mask_true_and_predict()

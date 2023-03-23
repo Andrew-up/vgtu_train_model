@@ -35,12 +35,12 @@ class callback_bce_dice_loss():
 
     def reduce_lr(self):
         _reduce_lr = ReduceLROnPlateau(monitor=self.monitor,
-                                       factor=0.333,
+                                       factor=0.05,
                                        patience=3,
                                        verbose=1,
                                        min_delta=1e-05,
                                        mode=self.mode,
-                                       min_lr=1e-04)
+                                       min_lr=1e-08)
         return _reduce_lr
 
     def early_stopping(self):

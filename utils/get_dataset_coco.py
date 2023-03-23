@@ -5,11 +5,12 @@ from pycocotools.coco import COCO
 from definitions import DATASET_PATH
 
 
-def filterDataset(ann_file_path, classes=None, mode='train', percent_valid=50):
+def filterDataset(ann_file_path, classes=None, mode='train', percent_valid=50, path_folder=None):
 
     # initialize COCO api for instance annotations
     annFile = ann_file_path
     # print(annFile)
+
     coco = COCO(annFile)
     print("filterDataset")
     images = []
@@ -43,6 +44,9 @@ def filterDataset(ann_file_path, classes=None, mode='train', percent_valid=50):
         valid_files = []
         for image_one in l:
             imagePath = DATASET_PATH + '/' + image_one['file_name']
+            if path_folder is not None:
+                imagePath = os.path.join(DATASET_PATH, path_folder)
+                imagePath = os.path.join(imagePath, image_one['file_name'])
             if os.path.exists(imagePath):
                 valid_files.append(image_one)
         group_class.append(valid_files)
@@ -64,9 +68,12 @@ def filterDataset(ann_file_path, classes=None, mode='train', percent_valid=50):
     images_train_unique = []
     images_valid_unique = []
     for classesss in group_class:
-        b = round(percent_valid / 100 * len(classesss))
-        images_train_tmp += classesss[b:]
-        images_valid_tmp += classesss[:b]
+        if percent_valid > 0:
+            b = round(percent_valid / 100 * len(classesss))
+            images_train_tmp += classesss[b:]
+            images_valid_tmp += classesss[:b]
+        else:
+            images_train_tmp += classesss
 
 
     #
@@ -98,8 +105,8 @@ def filterDataset(ann_file_path, classes=None, mode='train', percent_valid=50):
             images_valid_unique.append(images_valid_tmp[i])
 
     print('____________________________')
-    print(f'РАЗМЕР ДАТАСЕТА ДЛЯ ОБУЧЕНИЯ - : {len(images_train_unique)}')
-    print(f'РАЗМЕР ДАТАСЕТА ДЛЯ ВАЛИДАЦИИ - : {len(images_valid_unique)}')
+    # print(f'РАЗМЕР ДАТАСЕТА ДЛЯ ОБУЧЕНИЯ - : {len(images_train_unique)}')
+    # print(f'РАЗМЕР ДАТАСЕТА ДЛЯ ВАЛИДАЦИИ - : {len(images_valid_unique)}')
 
 
 
@@ -108,8 +115,10 @@ def filterDataset(ann_file_path, classes=None, mode='train', percent_valid=50):
     #     if images[i] not in unique_images:
     #         unique_images.append(images[i])
 
-    random.shuffle(images_valid_unique)
+    print(len(images_train_unique))
     random.shuffle(images_train_unique)
+    print(len(images_train_unique))
+    random.shuffle(images_valid_unique)
 
     if classes is not None:
         return images_train_unique, images_valid_unique, coco, classes
