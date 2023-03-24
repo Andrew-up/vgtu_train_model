@@ -44,16 +44,16 @@ def main():
 
     h, w, n_c = 128, 128, len(classes_train)
 
-    # return 0
+
     # for i in range(10):
-    batch_size = 8
+    batch_size = 2
 
 
 
 
     train_generator_class = DataGeneratorFromCocoJson(batch_size=batch_size,
                                                       subset='train',
-                                                      # path_folder='train',
+                                                      path_folder='train',
                                                       input_image_size=(128, 128),
                                                       image_list=images_train,
                                                       classes=classes_train,
@@ -61,7 +61,7 @@ def main():
                                                       shuffle=True)
 
     valid_generator_class = DataGeneratorFromCocoJson(batch_size=batch_size,
-                                                      # path_folder='valid',
+                                                      path_folder='valid',
                                                       subset='train',
                                                       input_image_size=(128, 128),
                                                       image_list=images_valid,
@@ -69,12 +69,14 @@ def main():
                                                       coco=coco_valid,
                                                       shuffle=True)
 
+
+
     print(f'h, w, n_c: {h, w, n_c}')
     i, m = train_generator_class.__getitem__(0)
 
-    vizualizator(i, m, classes_train)
-
     return 0
+
+    vizualizator(i, m, classes_train)
 
     model = get_model(img_size=(128, 128, 3), num_classes=len(classes_train))
 

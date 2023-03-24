@@ -2,11 +2,14 @@ import os.path
 import random
 
 import matplotlib.pyplot as plt
+import numpy
 import tensorflow as tf
 import cv2
 import numpy as np
+from PIL import ImageChops, Image, ImageDraw
+from matplotlib import cm
 from pycocotools.coco import COCO
-from definitions import DATASET_PATH
+from definitions import DATASET_PATH, ROOT_DIR
 
 
 
@@ -55,33 +58,21 @@ class DataGeneratorFromCocoJson(tf.keras.utils.Sequence):
         train_mask = np.zeros(self.input_image_size, dtype=np.uint8)
         for a in range(len(anns)):
 
-            # print(anns[a])
-            # print('=============')
             className = self.getClassName(anns[a]['category_id'], cats)
             pixel_value = self.classes.index(className) + 1
-            print(self.coco.annToMask(anns[a]))
-
             new_mask = cv2.resize(self.coco.annToMask(
                 anns[a]) * pixel_value, self.input_image_size)
-
             train_mask = np.maximum(new_mask, train_mask)
-            # train_mask = new_mask / 255.0
-        # plt.imshow(train_mask)
-        # plt.show()
+
         return train_mask
 
     def getLevelsMask(self, image_id):
         # for each category , we get the x mask and add it to mask list
         res = []
-        mask = np.zeros((self.input_image_size))
         for j, categorie in enumerate(self.catIds):
-            annIds = self.coco.getAnnIds(image_id, catIds=categorie, iscrowd=None)
-            anns = self.coco.loadAnns(annIds)
-            # print(image_id)
-            # print('SSSSSSSSSSSS')
             mask = self.getNormalMask(image_id, categorie)
-            # print(type(mask))
             res.append(mask)
+
         return res
 
     def getImage(self, file_path):
@@ -104,7 +95,10 @@ class DataGeneratorFromCocoJson(tf.keras.utils.Sequence):
         image = self.coco.loadImgs([image_id])[0]
         imagePath = DATASET_PATH +'/'+ image['file_name']
         if self.path_folder_image is not None:
-            imagePath = f'{DATASET_PATH}/{self.path_folder_image}/{image["file_name"]}'
+            pass
+            # imagePath = f'{DATASET_PATH}/{self.path_folder_image}/{image["file_name"]}'
+
+
             # print('folder is not none')
             # print(imagePath)
         # print(imagePath)
@@ -130,6 +124,11 @@ class DataGeneratorFromCocoJson(tf.keras.utils.Sequence):
             return img, mask_list
         return img, mask
 
+    def edit_background(self, img, mask):
+        # img_1 =
+
+        return 1, 2
+
 
     def __getitem__(self, index):
         X = np.empty((self.batch_size, 128, 128, 3))
@@ -150,51 +149,46 @@ class DataGeneratorFromCocoJson(tf.keras.utils.Sequence):
             # plt.imshow(self.getImage(getImagePathById(img_info['id'])))
             # print('sssssssssssss')
             mask_train = self.getLevelsMask(img_info['id'])
+            # print(np.array(mask_train).shape)
             X[i, ] = img
-            X[i, ], mask_train = self.flip_random(img, mask_train)
+            # print(np.array(mask_train).shape)
+            # print(X[i, ].shape)
+            # print('111111111111111')
+            # plt.imshow(np.array(X[i, ]))
+
+            # print(mask_train.shape)
+            # plt.imshow(np.array(mask_train), alpha=0.5)
+            # fix, ax = plt.subplots(nrows=1, ncols=4)
+            # ax[0, 0].imshow()
+
+
+
+            # X[i, ], mask_train = self.flip_random(img, mask_train)
             # X[i, ], mask_train = self.rot90_random(X[i, ], mask_train)
+            self.edit_background(X[i, ], mask_train)
             # X[i, ] = tf.image.random_brightness((X[i, ]*255).astype(np.uint8), 0.2)
             # X[i, ] = tf.image.random_contrast(X[i, ], 0.5, 0.8) / 255
 
 
 
+            # ax[0].imshow(np.array(X[i, ]))
+            # ax[0].set_title('image')
+            # ax[0].set_xticks(())
+            # ax[0].set_yticks(())
+            # fix.suptitle(f'{self.path_folder_image}')
 
-            # plt.imshow(X[i, ])
+
+            # plt.imshow(np.array(X[i, ]))
             # plt.show()
 
-            # print(X[i, ])
-            # print(type(mask_train))
-            # print(type(X[i, ]))
+            for j in range(len(self.catIds)):
+                # ax[j+1].imshow(np.array(mask_train[j]))
+                # ax[j+1].set_title(self.classes[j])
+                # ax[j+1].set_xticks(())
+                # ax[j+1].set_yticks(())
+                y[i, :, :, j] = mask_train[j]
 
-            # print(len(mask_train))
-
-
-            # print(i)
-            for j in self.catIds:
-
-                # print('==============')
-                # print(f'i: {i}')
-                # print(f'j: {j}')
-                y[i, :, :, j-1] = mask_train[j-1]
-                # y[i, :, :, j-1] = mask_train[j-1]
-                # y[i, :, :, j-1] = mask_train[j-1]
-                #
-                # y[i, :, :, j-1] = mask_train[j-1]
-                # y[i, :, :, j-1] = mask_train[j-1]
-                # y[i, :, :, j-1] = mask_train[j-1]
-                #
-                # y[i, :, :, j-1] = mask_train[j-1]
-                # y[i, :, :, j-1] = mask_train[j-1]
-                # y[i, :, :, j-1] = mask_train[j-1]
-                #
-                # y[i, :, :, j-1] = mask_train[j-1]
-                # y[i, :, :, j-1] = mask_train[j-1]
-                # y[i, :, :, j-1] = mask_train[j-1]
-
-                # y[i, :, :, j-1] = mask_train[j-1]
-                # y[i, :, :, j-1] = mask_train[j-1]
-
-
+            # plt.show()
 
         X = np.array(X)
         y = np.array(y)

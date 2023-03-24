@@ -76,7 +76,7 @@ def get_model(img_size, num_classes):
     model = keras.Model(inputs, outputs)
 
     iou = MyMeanIOU(num_classes=num_classes
-                    , ignore_class=0
+                    # , ignore_class=0
                     )
     # loss = binary_weighted_cross_entropy(beta=0.9, is_logits=True)
     # model.compile(optimizer=SGD_loss(), loss=dice_loss, metrics=[iou, 'accuracy'])
