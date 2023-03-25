@@ -26,13 +26,14 @@ def main():
     else:
         print(f'Удалено старых моделей h5 и zip архивов: {check_garbage_files_count}')
     timer = time.time()
-    images_train, _, coco_train, classes_train = filterDataset(ANNOTATION_FILE_PATH,
+
+    images_train, _, coco_train, classes_train = filterDataset(ANNOTATION_FILE_PATH_TRAIN,
                                                                percent_valid=0,
-                                                               # path_folder='train'
+                                                               path_folder='train'
                                                                )
-    images_valid, _, coco_valid, classes_valid = filterDataset(ANNOTATION_FILE_PATH,
+    images_valid, _, coco_valid, classes_valid = filterDataset(ANNOTATION_FILE_PATH_VALID,
                                                                percent_valid=0,
-                                                               # path_folder='valid'
+                                                               path_folder='valid'
                                                                )
 
     print('classes_train: ')
@@ -46,9 +47,7 @@ def main():
 
 
     # for i in range(10):
-    batch_size = 2
-
-
+    batch_size = 4
 
 
     train_generator_class = DataGeneratorFromCocoJson(batch_size=batch_size,
@@ -73,9 +72,6 @@ def main():
 
     print(f'h, w, n_c: {h, w, n_c}')
     i, m = train_generator_class.__getitem__(0)
-
-    return 0
-
     vizualizator(i, m, classes_train)
 
     model = get_model(img_size=(128, 128, 3), num_classes=len(classes_train))

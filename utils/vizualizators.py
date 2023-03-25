@@ -27,7 +27,7 @@ def vizualizator(list_images, list_masks, classes):
     x, y = list_images, list_masks
     fig = plt.figure(figsize=(50, 40))
     gs = gridspec.GridSpec(nrows=len(x), ncols=2)
-    colors = ['#705335', '#25221B', '#E63244', '#EC7C26', '#474B4E', '#D84B20', '#8F8F8F', '#6D6552', '#4E5754',
+    colors = ['#0044ff', '#ff00fb', '#ff0000', '#2bff00', '#474B4E', '#D84B20', '#8F8F8F', '#6D6552', '#4E5754',
               '#6C4675', '#969992', '#9E9764']
     labels = classes
     patches = [mpatches.Patch(
@@ -69,14 +69,14 @@ from keras import backend as K
 
 
 def show_mask_true_and_predict():
-    images_train, images_valid, coco, classes = filterDataset(ANNOTATION_FILE_PATH,
+    images_train, images_valid, coco, classes = filterDataset(ANNOTATION_FILE_PATH_TEST,
                                                               percent_valid=0,
-                                                              # path_folder='test'
+                                                              path_folder='test'
                                                               )
     paths_m = os.path.join(MODEL_H5_PATH, 'model_1_0_10.h5')
 
     iou1111 = MyMeanIOU(num_classes=len(classes),
-                        ignore_class=0
+                        # ignore_class=0
                         )
     model = load_model(paths_m, custom_objects={'dice_loss': dice_loss,
                                                 'MyMeanIOU': iou1111,
@@ -86,7 +86,7 @@ def show_mask_true_and_predict():
     # model = load_model(model)
     for j in range(1):
         train_generator_class = DataGeneratorFromCocoJson(batch_size=6,
-                                                          # path_folder='test',
+                                                          path_folder='test',
                                                           subset='train',
                                                           input_image_size=(128, 128),
                                                           image_list=images_train,
@@ -189,9 +189,9 @@ def iou_coef(y_true, y_pred, smooth=1):
 
 def pppppppppp():
     # return 0
-    images_train, images_valid, coco, classes = filterDataset(ANNOTATION_FILE_PATH,
+    images_train, images_valid, coco, classes = filterDataset(ANNOTATION_FILE_PATH_TEST,
                                                               percent_valid=0,
-                                                              # path_folder='test'
+                                                              path_folder='test'
                                                               )
     paths_m = os.path.join(MODEL_H5_PATH, 'model_1_0_10.h5')
 
@@ -205,7 +205,7 @@ def pppppppppp():
                                                 })
 
     train_generator_class = DataGeneratorFromCocoJson(batch_size=6,
-                                                      # path_folder='test',
+                                                      path_folder='test',
                                                       subset='train',
                                                       input_image_size=(128, 128),
                                                       image_list=images_train,
