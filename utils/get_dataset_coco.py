@@ -115,9 +115,9 @@ def filterDataset(ann_file_path, classes=None, mode='train', percent_valid=50, p
     #     if images[i] not in unique_images:
     #         unique_images.append(images[i])
 
-    print(len(images_train_unique))
+    # print(len(images_train_unique))
     random.shuffle(images_train_unique)
-    print(len(images_train_unique))
+    # print(len(images_train_unique))
     random.shuffle(images_valid_unique)
 
     if classes is not None:

@@ -1,8 +1,22 @@
-import  numpy as np
+import matplotlib.pyplot as plt
+import numpy as np
 
-a = np.array([[22, 0], [2, 0],[1,2]])
+# full_np = np.zeros((5, 5, 1)).astype(np.uint8)
+# a = np.zeros((5, 5, 1)).astype(np.uint8)
+#
+# print(full_np.shape)
+#
+#
+#
+#
+#
+# plt.imshow(a)
+# plt.show()
 
-a[a>1] = 255
-print(type(a))
+def gen_test():
+    for i in [2,3,4,5,6]:
+        yield i
 
-print(a)
+print(next(gen_test()))
+print(next(gen_test()))
+print(next(gen_test()))

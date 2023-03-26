@@ -32,19 +32,20 @@ def train_model(model: Sequential,
     checkpoint = callback.checkpoint()
     print_test = callback.print_test()
     print('dataset_size_train: ' + str(dataset_size_train))
-    steps_per_epoch = int(dataset_size_train // batch_size)
-    validation_steps = len(dataset_valid) // batch_size
-    print(f'steps_per_epoch: {steps_per_epoch}')
-    print(f'validation_steps: {validation_steps}')
-    print('+++++++++++++++++++++++++++++++++++')
+    # steps_per_epoch = int(dataset_size_train // batch_size)
+    # validation_steps = len(dataset_valid) // batch_size
+    # print(f'steps_per_epoch: {steps_per_epoch}')
+    # print(f'validation_steps: {validation_steps}')
+    # print('+++++++++++++++++++++++++++++++++++')
 
     history = model.fit(
         dataset_train,
         validation_data=dataset_valid,
         # validation_steps=validation_steps,
-        steps_per_epoch=steps_per_epoch,
+        steps_per_epoch=100,
         epochs=n_epoch,
-        batch_size=batch_size,
+        validation_steps=25,
+        # batch_size=batch_size,
         callbacks=[tb_callback, reduce_lr, checkpoint, print_test],
         verbose=True,
         # validation_split=0.3

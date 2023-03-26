@@ -13,6 +13,7 @@ from keras.utils import img_to_array
 from definitions import ANNOTATION_FILE_PATH, DATASET_PATH, MODEL_H5_PATH, ANNOTATION_FILE_PATH_TRAIN, \
     ANNOTATION_FILE_PATH_TEST, ANNOTATION_FILE_PATH_VALID
 from utils.DataGeneratorFromCocoJson import DataGeneratorFromCocoJson
+from  utils.newDataGeneratorCoco import ssssssssssssssssssssssssaaaaaaaaaaaaaaaaaa, augmentationsGenerator
 from utils.get_dataset_coco import filterDataset
 from utils.model_losses import dice_coef, bce_dice_loss, jaccard_distance, iou, jaccard_coef, dice_coef_loss, \
     binary_weighted_cross_entropy, dice_loss
@@ -55,7 +56,7 @@ def vizualizator(list_images, list_masks, classes):
         for i in range(len(mask[0, 0, :])):
             mask_one = mask[:, :, i]
             l = ax1.imshow(np.ma.masked_where(
-                mask_one == False, mask_one), cmap=mpl.colors.ListedColormap(colors[i]), alpha=1)
+                mask_one == False, mask_one), cmap=mpl.colors.ListedColormap(colors[i]), alpha=0.6)
             listMasks.append(l)
 
         colors = [im.cmap(im.norm(1)) for im in listMasks]
@@ -69,9 +70,9 @@ from keras import backend as K
 
 
 def show_mask_true_and_predict():
-    images_train, images_valid, coco, classes = filterDataset(ANNOTATION_FILE_PATH_TEST,
+    images_train, images_valid, coco, classes = filterDataset(ANNOTATION_FILE_PATH,
                                                               percent_valid=0,
-                                                              path_folder='test'
+                                                              # path_folder='test'
                                                               )
     paths_m = os.path.join(MODEL_H5_PATH, 'model_1_0_10.h5')
 
@@ -85,27 +86,25 @@ def show_mask_true_and_predict():
                                                 })
     # model = load_model(model)
     for j in range(1):
-        train_generator_class = DataGeneratorFromCocoJson(batch_size=6,
-                                                          path_folder='test',
-                                                          subset='train',
-                                                          input_image_size=(128, 128),
-                                                          image_list=images_train,
-                                                          classes=classes,
-                                                          coco=coco,
-                                                          shuffle=False)
+        train_generator_class = ssssssssssssssssssssssssaaaaaaaaaaaaaaaaaa(images_train,
+                                                                           classes=classes,
+                                                                           coco=coco,
+                                                                           mask_type="normal",
+                                                                           input_image_size=(128, 128),
+                                                                           batch_size=6)
 
-        img_s, mask_s = train_generator_class.__getitem__(0)
+        aug_gen = augmentationsGenerator(train_generator_class)
+
+        img_s, mask_s = next(aug_gen)
         res = model.predict(img_s)
-
         fig = plt.figure(figsize=(10, 25))
         gs = gridspec.GridSpec(nrows=len(img_s), ncols=4)
-        colors = ['#0000ff', '#ff0066', '#66ff33', '#ffff00', '#ffccff', '#D84B20', '#8F8F8F', '#6D6552', '#4E5754', '#6C4675', '#969992', '#9E9764', '#969992', '#9E9764']
+        colors = ['#ffccff', '#D84B20', '#8F8F8F', '#6D6552', '#4E5754', '#6C4675', '#969992', '#9E9764','#0000ff', '#ff0066', '#66ff33', '#ffff00', '#969992', '#9E9764',]
         patches = [mpatches.Patch(
             color=colors[i], label=f"{classes[i]}") for i in range(len(classes))]
 
         flag = False
         for i in range(0, len(img_s)):
-
             images, mask = img_s[i], mask_s[i]
             sample_img = images
             ax0 = fig.add_subplot(gs[i, 0])
@@ -189,9 +188,9 @@ def iou_coef(y_true, y_pred, smooth=1):
 
 def pppppppppp():
     # return 0
-    images_train, images_valid, coco, classes = filterDataset(ANNOTATION_FILE_PATH_TEST,
+    images_train, images_valid, coco, classes = filterDataset(ANNOTATION_FILE_PATH,
                                                               percent_valid=0,
-                                                              path_folder='test'
+                                                              # path_folder='test'
                                                               )
     paths_m = os.path.join(MODEL_H5_PATH, 'model_1_0_10.h5')
 
@@ -204,8 +203,16 @@ def pppppppppp():
                                                 # 'jaccard_coef': jaccard_coef
                                                 })
 
+    # train_generator_class = DataGeneratorFromCocoJson(batch_size=6,
+    #                                                   # path_folder='test',
+    #                                                   subset='train',
+    #                                                   input_image_size=(128, 128),
+    #                                                   image_list=images_train,
+    #                                                   classes=classes,
+    #                                                   coco=coco,
+    #                                                   shuffle=True)  #
     train_generator_class = DataGeneratorFromCocoJson(batch_size=6,
-                                                      path_folder='test',
+                                                      # path_folder='test',
                                                       subset='train',
                                                       input_image_size=(128, 128),
                                                       image_list=images_train,
@@ -372,7 +379,7 @@ def test():
 
 if __name__ == "__main__":
     #     # test()
-    pppppppppp()
+    # pppppppppp()
     # main()
     # viz_model()
     show_mask_true_and_predict()

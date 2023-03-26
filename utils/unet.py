@@ -6,7 +6,7 @@ from keras import backend as K
 from keras_unet.models import custom_unet
 
 from utils.model_optimizers import SGD_loss
-from utils.model_losses import binary_weighted_cross_entropy
+from utils.model_losses import binary_weighted_cross_entropy, bce_dice_loss
 
 def dice_loss(y_true, y_pred):
     numerator = tf.reduce_sum(y_true * y_pred)
@@ -18,7 +18,7 @@ class MyMeanIOU(tf.keras.metrics.MeanIoU):
         return super().update_state(tf.argmax(y_true, axis=-1), tf.argmax(y_pred, axis=-1), sample_weight)
 
 
-def get_model(img_size, num_classes):
+def get_model(img_size, num_classes, iou_valid=12):
 
     inputs = keras.Input(shape=img_size)
 
@@ -76,9 +76,9 @@ def get_model(img_size, num_classes):
     model = keras.Model(inputs, outputs)
 
     iou = MyMeanIOU(num_classes=num_classes
-                    , ignore_class=0
+                    # , ignore_class=0
                     )
     # loss = binary_weighted_cross_entropy(beta=0.9, is_logits=True)
     # model.compile(optimizer=SGD_loss(), loss=dice_loss, metrics=[iou, 'accuracy'])
-    model.compile(optimizer="adam", loss=dice_loss, metrics=[iou, 'accuracy'])
+    model.compile(optimizer=SGD_loss(), loss=dice_loss, metrics=[iou, 'accuracy'])
     return model

@@ -30,14 +30,19 @@ def update_model_history(data: ModelHistory):
 #     data_json = json.dumps(data.__dict__)
 #     r = requests.post(url_string, data=data_json, headers={"Content-Type": "application/json"})
 #     print(r.text)
+def get_category_not_null():
+    url_string = f'http://localhost:5000/api/categorical/all_not_null/'
+    r = requests.get(url_string)
+    return len(r.json())
 
 
-# if __name__ == '__main__':
+
+if __name__ == '__main__':
 #     m = ModelHistory()
 #     m.status = 'ssss'
 #     add_history_model(m)
     # print(get_last_model_history())
-    # get_model_history()
+    get_category_not_null()
     # m = ModelHistory()
     # m.id = 1
     # m.status = 'test1ddd23'

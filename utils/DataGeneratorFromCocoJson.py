@@ -8,9 +8,11 @@ import cv2
 import numpy as np
 from PIL import ImageChops, Image, ImageDraw
 from keras_preprocessing.image import ImageDataGenerator
-from matplotlib import cm
+from matplotlib import cm, gridspec
 from pycocotools.coco import COCO
 from definitions import DATASET_PATH, ROOT_DIR
+
+
 
 
 class DataGeneratorFromCocoJson(tf.keras.utils.Sequence):
@@ -67,7 +69,6 @@ class DataGeneratorFromCocoJson(tf.keras.utils.Sequence):
     def getLevelsMask(self, image_id):
         # for each category , we get the x mask and add it to mask list
         res = []
-        mask = np.zeros(self.input_image_size)
         for j, categorie in enumerate(self.catIds):
             mask = self.getNormalMask(image_id, categorie)
             res.append(mask)
@@ -84,11 +85,6 @@ class DataGeneratorFromCocoJson(tf.keras.utils.Sequence):
         else:
             stacked_img = np.stack((train_img,) * 3, axis=-1)
             return stacked_img
-
-    def get_image_Infos_by_path_id(self, node):
-        for dict in self.image_list:
-            if dict['file_name'] == node:
-                return dict
 
     def getImagePathByCocoId(self, image_id):
         image = self.coco.loadImgs([image_id])[0]
@@ -122,31 +118,38 @@ class DataGeneratorFromCocoJson(tf.keras.utils.Sequence):
             return img, mask_list
         return img, mask
 
-    def edit_background(self, img, mask):
+    def edit_background(self, img, mask_image_all):
         dir = os.path.join(ROOT_DIR, "rand_back")
         l = os.listdir(dir)
         allfiles = []
         for file in l:
             if file.endswith(".jpg"):
                 allfiles.append(os.path.join(dir, file))
-
         path_img_back = random.choice(allfiles)
+        w = img[0].shape[0]
+        h = img[0].shape[1]
         background = cv2.imread(os.path.join(ROOT_DIR, path_img_back), flags=cv2.COLOR_BGR2RGB)
-        background = cv2.resize(background, dsize=(128, 128))
+        background = cv2.resize(background, dsize=(w, h))
+        img_list = []
+        for index, image in enumerate(img):
+            img_n = cv2.normalize(src=image, dst=None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+            mask_image_12channel = mask_image_all[index]
+            full_mask = np.zeros((w, h), dtype="uint8")
 
-        for u in mask:
-            if u.max() >= 1:
-                img_n = cv2.normalize(src=img, dst=None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8U)
-                u[u >= 1] = 255
-                u = np.array(u, dtype=bool)
-                background111 = np.zeros_like(img_n)
-                background111[u] = img_n[u]
-                background111[~u] = background[~u]
-                img = background111.astype(np.float64) / 255
+            for levelmask in range(len(mask_image_12channel[0, 0, :])):
+                mask_one_channel = mask_image_12channel[:, :, levelmask]
+                mask_one_channel = np.array(mask_one_channel, dtype=bool)
+                np.putmask(full_mask, mask_one_channel, 255)
 
+            mask_bool = np.array(full_mask, dtype=bool)
+            background_result = np.zeros_like(img_n)
+            background_result[mask_bool] = img_n[mask_bool]
+            background_result[~mask_bool] = background[~mask_bool]
+            imgss = background_result.astype(np.float64) / 255
+            img_list.append(imgss)
 
-        # print('edit back')
-        return img
+        np.array(img_list, dtype=np.uint8)
+        return np.array(img_list)
 
     def __getitem__(self, index):
         X = np.empty((self.batch_size, 128, 128, 3))
@@ -157,43 +160,20 @@ class DataGeneratorFromCocoJson(tf.keras.utils.Sequence):
             img_info = self.image_list[value]
             img = self.getImage(self.getImagePathByCocoId(img_info['id']))
             mask_train = self.getLevelsMask(img_info['id'])
-            X[i, ] = img
-            # print(np.array(mask_train).shape)
-            # print(X[i, ].shape)
-            # print('111111111111111')
-            # plt.imshow(np.array(X[i, ]))
-
-            # print(mask_train.shape)
-            # plt.imshow(np.array(mask_train), alpha=0.5)
-            # fix, ax = plt.subplots(nrows=1, ncols=4)
-            # ax[0, 0].imshow()
-
-            # X[i, ], mask_train = self.flip_random(img, mask_train)
-            # X[i, ], mask_train = self.rot90_random(X[i, ], mask_train)
-            # X[i, ] = self.edit_background(X[i, ], mask_train)
+            X[i,] = img
+            X[i,] = self.edit_background(X[i,], mask_train)
+            X[i,], mask_train = self.flip_random(X[i,], mask_train)
+            X[i,], mask_train = self.rot90_random(X[i,], mask_train)
             # X[i, ] = tf.image.random_brightness((X[i, ]*255).astype(np.uint8), 0.2)
             # X[i, ] = tf.image.random_contrast(X[i, ], 0.5, 0.8) / 255
 
-            # ax[0].imshow(np.array(X[i, ]))
-            # ax[0].set_title('image')
-            # ax[0].set_xticks(())
-            # ax[0].set_yticks(())
-            # fix.suptitle(f'{self.path_folder_image}')
+            for j in self.catIds:
+                y[i, :, :, j - 1] = mask_train[j - 1]
 
-            # plt.imshow(np.array(X[i, ]))
             # plt.show()
 
-            for j in self.catIds:
-                # ax[j+1].imshow(np.array(mask_train[j]))
-                # ax[j+1].set_title(self.classes[j])
-                # ax[j+1].set_xticks(())
-                # ax[j+1].set_yticks(())
-                y[i, :, :, j] = mask_train[j]
-
-            plt.show()
-
-        X = np.array(X)
-        y = np.array(y)
+        # X = np.array(X)
+        # y = np.array(y)
 
         if self.subset == 'train':
             return X, y
