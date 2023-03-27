@@ -40,13 +40,13 @@ class callback_bce_dice_loss():
                                        verbose=1,
                                        min_delta=1e-05,
                                        mode=self.mode,
-                                       min_lr=1e-08)
+                                       min_lr=1e-05)
         return _reduce_lr
 
     def early_stopping(self):
         _early_stopping = EarlyStopping(monitor=self.monitor,
                                         min_delta=0.0001,
-                                        patience=5,
+                                        patience=20,
                                         mode=self.mode)
         return _early_stopping
 

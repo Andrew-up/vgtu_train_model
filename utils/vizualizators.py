@@ -13,7 +13,7 @@ from keras.utils import img_to_array
 from definitions import ANNOTATION_FILE_PATH, DATASET_PATH, MODEL_H5_PATH, ANNOTATION_FILE_PATH_TRAIN, \
     ANNOTATION_FILE_PATH_TEST, ANNOTATION_FILE_PATH_VALID
 from utils.DataGeneratorFromCocoJson import DataGeneratorFromCocoJson
-from  utils.newDataGeneratorCoco import ssssssssssssssssssssssssaaaaaaaaaaaaaaaaaa, augmentationsGenerator
+from  utils.newDataGeneratorCoco import cocoDataGenerator, augmentationsGenerator
 from utils.get_dataset_coco import filterDataset
 from utils.model_losses import dice_coef, bce_dice_loss, jaccard_distance, iou, jaccard_coef, dice_coef_loss, \
     binary_weighted_cross_entropy, dice_loss
@@ -86,16 +86,16 @@ def show_mask_true_and_predict():
                                                 })
     # model = load_model(model)
     for j in range(1):
-        train_generator_class = ssssssssssssssssssssssssaaaaaaaaaaaaaaaaaa(images_train,
-                                                                           classes=classes,
-                                                                           coco=coco,
-                                                                           mask_type="normal",
-                                                                           input_image_size=(128, 128),
-                                                                           batch_size=6)
+        train_generator_class = cocoDataGenerator(images_train,
+                                                  classes=classes,
+                                                  coco=coco,
+                                                  mask_type="normal",
+                                                  input_image_size=(128, 128),
+                                                  batch_size=4)
 
         aug_gen = augmentationsGenerator(train_generator_class)
 
-        img_s, mask_s = next(aug_gen)
+        img_s, mask_s = next(train_generator_class)
         res = model.predict(img_s)
         fig = plt.figure(figsize=(10, 25))
         gs = gridspec.GridSpec(nrows=len(img_s), ncols=4)

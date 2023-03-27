@@ -26,13 +26,13 @@ def unet_model(num_classes: int):
         input_shape=(128, 128, 3),
         use_batch_norm=True,
         num_classes=num_classes,
-        filters=32,
+        filters=64,
         num_layers=4,
         dropout=0.2,
         activation="relu",
         output_activation='softmax'
     )
-    iou = MyMeanIOU(num_classes=num_classes, ignore_class=0)
+    iou = MyMeanIOU(num_classes=num_classes)
     # loss = binary_weighted_cross_entropy(beta=0.9, is_logits=True)
     model.compile(optimizer=SGD_loss(), loss=dice_loss, metrics=[iou, 'accuracy'])
     return model

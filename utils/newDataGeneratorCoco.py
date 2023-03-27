@@ -82,31 +82,37 @@ def hui():
     return 'хуй блять'
 
 
-def ssssssssssssssssssssssssaaaaaaaaaaaaaaaaaa(images, classes, coco, folder= None,
-                                               input_image_size=(224, 224), batch_size=4, mode='train',
-                                               mask_type='binary'):
+def cocoDataGenerator(images, classes, coco, folder=None,
+                      input_image_size=(224, 224), batch_size=2, mode='train',
+                      mask_type='binary',
+                      shuffle=False):
     # img_folder = '{}/images/{}'.format(folder, mode)
     dataset_size = len(images)
     catIds = coco.getCatIds(catNms=classes)
     c = 0
+    if shuffle:
+        random.shuffle(images)
     while (True):
         img = np.zeros((batch_size, input_image_size[0], input_image_size[1], 3)).astype('float')
         mask = np.zeros((batch_size, input_image_size[0], input_image_size[1], len(classes))).astype('float')
-
+        # print(img.shape)
         for i in range(c, c + batch_size):  # initially from 0 to batch_size, when c = 0
             imageObj = images[i]
             file_path_image = getImagePathByCocoId(coco, image_id=imageObj["id"])
             train_img = getImage(file_path=file_path_image, input_image_size=input_image_size)
             mask_train = getLevelsMask(coco, imageObj['id'], catIds, input_image_size)
-            for j in catIds:
-                mask[i, :, :, j - 1] = mask_train[j - 1]
+            # print(np.array(mask_train).shape)
+            for j in range(len(classes)):
+                mask[i-c, :, :, j-1] = mask_train[j-1]
             img[i - c] = train_img
+
             # plt.imshow(img[i-c])
             # plt.show()
 
         c += batch_size
         if (c + batch_size >= dataset_size):
             c = 0
+            # print('WOOOOOOOOOOOOOOORK')
             random.shuffle(images)
 
         yield img, mask
@@ -159,35 +165,39 @@ def rot90_random(img, mask):
 
 
 def edit_background(img, mask_image_all):
-    dir = os.path.join(ROOT_DIR, "rand_back")
-    l = os.listdir(dir)
-    allfiles = []
-    for file in l:
-        if file.endswith(".jpg"):
-            allfiles.append(os.path.join(dir, file))
-    path_img_back = random.choice(allfiles)
-    w = img[0].shape[0]
-    h = img[0].shape[1]
-    background = cv2.imread(os.path.join(ROOT_DIR, path_img_back), flags=cv2.COLOR_BGR2RGB)
-    background = cv2.resize(background, dsize=(w, h))
+    flip_bool = bool(random.getrandbits(1))
     img_list = []
-    for index, image in enumerate(img):
-        img_n = cv2.normalize(src=image, dst=None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8U)
-        mask_image_12channel = mask_image_all[index]
-        full_mask = np.zeros((w, h), dtype="uint8")
+    if flip_bool:
+        dir = os.path.join(ROOT_DIR, "rand_back")
+        l = os.listdir(dir)
+        allfiles = []
+        for file in l:
+            if file.endswith(".jpg") or file.endswith(".jpeg"):
+                allfiles.append(os.path.join(dir, file))
+        path_img_back = random.choice(allfiles)
+        w = img[0].shape[0]
+        h = img[0].shape[1]
+        background = cv2.imread(os.path.join(ROOT_DIR, path_img_back), flags=cv2.COLOR_BGR2RGB)
+        background = cv2.resize(background, dsize=(w, h))
 
-        for levelmask in range(len(mask_image_12channel[0, 0, :])):
-            mask_one_channel = mask_image_12channel[:, :, levelmask]
-            mask_one_channel = np.array(mask_one_channel, dtype=bool)
-            np.putmask(full_mask, mask_one_channel, 255)
+        for index, image in enumerate(img):
+            img_n = cv2.normalize(src=image, dst=None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+            mask_image_12channel = mask_image_all[index]
+            full_mask = np.zeros((w, h), dtype="uint8")
 
-        mask_bool = np.array(full_mask, dtype=bool)
-        background_result = np.zeros_like(img_n)
-        background_result[mask_bool] = img_n[mask_bool]
-        background_result[~mask_bool] = background[~mask_bool]
-        imgss = background_result.astype(np.float64) / 255
-        img_list.append(imgss)
+            for levelmask in range(len(mask_image_12channel[0, 0, :])):
+                mask_one_channel = mask_image_12channel[:, :, levelmask]
+                mask_one_channel = np.array(mask_one_channel, dtype=bool)
+                np.putmask(full_mask, mask_one_channel, 255)
 
+            mask_bool = np.array(full_mask, dtype=bool)
+            background_result = np.zeros_like(img_n)
+            background_result[mask_bool] = img_n[mask_bool]
+            background_result[~mask_bool] = background[~mask_bool]
+            imgss = background_result.astype(np.float64) / 255
+            img_list.append(imgss)
+    else:
+        img_list = img
     np.array(img_list, dtype=np.uint8)
     yield np.array(img_list), np.array(mask_image_all)
 
@@ -197,7 +207,6 @@ def augmentationsGenerator(gen):
         gen = rot90_random(img, mask)
         img222, mask222 = next(gen)
         gen2 = edit_background(img222, mask222)
-        # print('wwwwwwwwwwwwwwwwwww')
         img222, mask222 = next(gen2)
         img_aug = img222
         mask_aug = mask222
