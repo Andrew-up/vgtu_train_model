@@ -172,8 +172,8 @@ class DataGeneratorFromCocoJson(tf.keras.utils.Sequence):
 
             # plt.show()
 
-        # X = np.array(X)
-        # y = np.array(y)
+        X = np.array(X)
+        y = np.array(y)
 
         if self.subset == 'train':
             return X, y

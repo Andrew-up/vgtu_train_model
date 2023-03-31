@@ -40,7 +40,7 @@ class callback_bce_dice_loss():
                                        verbose=1,
                                        min_delta=1e-05,
                                        mode=self.mode,
-                                       min_lr=1e-05)
+                                       min_lr=1e-08)
         return _reduce_lr
 
     def early_stopping(self):
@@ -56,7 +56,7 @@ class callback_bce_dice_loss():
             # print(epoch)
             # print(logs)
             self.result_model_history.current_epochs = epoch
-            # update_model_history(self.result_model_history)
+            update_model_history(self.result_model_history)
 
     def on_train_end_update(self, logs):
         if self.result_model_history:

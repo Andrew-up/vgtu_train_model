@@ -61,6 +61,8 @@ def bce_dice_loss(y_true, y_pred):
     return 0.5 * dice_loss + 0.5 * bce_loss
 
 
+
+
 def plot_segm_history(history, metrics=["iou", "val_iou"], losses=["loss", "val_loss"]):
     """[summary]
 

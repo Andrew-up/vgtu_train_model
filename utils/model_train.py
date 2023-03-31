@@ -16,8 +16,9 @@ def train_model(model: Sequential,
                 dataset_train=None,
                 dataset_valid=None,
                 dataset_size_train=0,
+                dataset_size_val=0,
                 model_history: ModelHistory = None,
-                monitor='my_mean_iou'):
+                monitor='val_my_mean_iou'):
     if model_history:
         model_history.total_epochs = n_epoch
         update_model_history(model_history)
@@ -32,8 +33,8 @@ def train_model(model: Sequential,
     checkpoint = callback.checkpoint()
     print_test = callback.print_test()
     early_stop_train = callback.early_stopping()
-    print('dataset_size_train: ' + str(dataset_size_train))
-    # steps_per_epoch = int(dataset_size_train // batch_size)
+
+    steps_per_epoch = int(dataset_size_train // batch_size)
     # validation_steps = len(dataset_valid) // batch_size
     # print(f'steps_per_epoch: {steps_per_epoch}')
     # print(f'validation_steps: {validation_steps}')
@@ -43,12 +44,12 @@ def train_model(model: Sequential,
         dataset_train,
         validation_data=dataset_valid,
         # validation_steps=validation_steps,
-        steps_per_epoch=500,
+        steps_per_epoch=steps_per_epoch,
         epochs=n_epoch,
-        validation_steps=150,
-        # batch_size=batch_size,
+        validation_steps=25,
         callbacks=[tb_callback, reduce_lr, checkpoint, print_test, early_stop_train],
         verbose=True,
+        # batch_size=batch_size
         # validation_split=0.3
     )
     return history

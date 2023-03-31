@@ -10,13 +10,49 @@ from keras.models import Model, load_model
 import tensorflow as tf
 from keras.utils import img_to_array
 
-from definitions import ANNOTATION_FILE_PATH, DATASET_PATH, MODEL_H5_PATH, ANNOTATION_FILE_PATH_TRAIN, \
-    ANNOTATION_FILE_PATH_TEST, ANNOTATION_FILE_PATH_VALID
+from definitions import ANNOTATION_FILE_PATH, DATASET_PATH, MODEL_H5_PATH, ANNOTATION_FILE_PATH_TRAIN
 from utils.DataGeneratorFromCocoJson import DataGeneratorFromCocoJson
-from  utils.newDataGeneratorCoco import cocoDataGenerator, augmentationsGenerator
+from utils.newDataGeneratorCoco import cocoDataGenerator, augmentationsGenerator, visualizeGenerator
 from utils.get_dataset_coco import filterDataset
-from utils.model_losses import dice_coef, bce_dice_loss, jaccard_distance, iou, jaccard_coef, dice_coef_loss, \
+from utils.model_losses import bce_dice_loss, \
     binary_weighted_cross_entropy, dice_loss
+
+
+def dice_coef(y_true, y_pred, smooth=100):
+    y_true_f = K.flatten(y_true)
+    y_pred_f = K.flatten(y_pred)
+    intersection = K.sum(y_true_f * y_pred_f)
+    dice = (2. * intersection + smooth) / (K.sum(y_true_f) + K.sum(y_pred_f) + smooth)
+    return dice
+
+
+def dice_coef_loss(y_true, y_pred):
+    return -dice_coef(y_true, y_pred)
+
+
+def visualize_mask(mask):
+    print(mask.shape)
+
+    # Определяем цвета для каждого класса
+    colors = {
+        0: (0, 0, 0),  # Черный цвет для фона
+        1: (255, 0, 0),  # Красный цвет для класса 1
+        2: (0, 255, 0),  # Зеленый цвет для класса 2
+        3: (0, 0, 255)  # Синий цвет для класса 3
+    }
+
+    # Создаем цветовую маску
+    color_mask = np.zeros((mask.shape[0], mask.shape[1], 3), dtype=np.uint8)
+    for i in range(mask.shape[0]):
+        for j in range(mask.shape[1]):
+            class_id = int(mask[i, j, 0])
+            if class_id in colors:
+                color_mask[i, j, :] = colors[class_id]
+
+    # Выводим цветовую маску
+    plt.imshow(color_mask)
+    plt.axis('off')
+    plt.show()
 
 
 class MyMeanIOU(tf.keras.metrics.MeanIoU):
@@ -24,49 +60,63 @@ class MyMeanIOU(tf.keras.metrics.MeanIoU):
         return super().update_state(tf.argmax(y_true, axis=-1), tf.argmax(y_pred, axis=-1), sample_weight)
 
 
-def vizualizator(list_images, list_masks, classes):
-    x, y = list_images, list_masks
-    fig = plt.figure(figsize=(50, 40))
-    gs = gridspec.GridSpec(nrows=len(x), ncols=2)
-    colors = ['#0044ff', '#ff00fb', '#ff0000', '#2bff00', '#474B4E', '#D84B20', '#8F8F8F', '#6D6552', '#4E5754',
-              '#6C4675', '#969992', '#9E9764']
-    labels = classes
-    patches = [mpatches.Patch(
-        color=colors[i], label=f"{labels[i]}") for i in range(len(labels))]
+colors_dict = {
+    0: [0, 0, 0],  # Черный
+    1: [0, 255, 0],  # Зеленый
+    2: [0, 0, 255],  # Синий
+    3: [255, 255, 0],  # Желтый
+    4: [0, 255, 255],  # Бирюзовый
+    5: [128, 0, 128],  # Фиолетовый
+    6: [255, 165, 0],  # Оранжевый
+    7: [255, 192, 203],  # Розовый
+    8: [128, 128, 128],  # Серый
+    9: [165, 42, 42],  # Коричневый
+    10: [128, 128, 0],  # Оливковый
+    11: [0, 255, 0],  # Лайм
+    12: [0, 128, 128],  # Морской волны
+    13: [255, 255, 255],  # Белый
+    14: [255, 0, 0]  # Красный
+
+}
 
 
-    flag = False
-    for i in range(0, len(list_images)):
+def visualize_mask2(mask):
+    # Создаем пустой массив для раскрашенной маски
+    colored_mask = np.zeros((mask.shape[0], mask.shape[1], 3), dtype=np.uint8)
+    # Проходимся по всем пикселям маски
+    for i in range(mask.shape[0]):
+        for j in range(mask.shape[1]):
+            # Получаем класс текущего пикселя
+            cls = mask[i, j, 0]
+            # Получаем цвет для данного класса из словаря
+            color = colors_dict[cls]
+            # Раскрашиваем пиксель в соответствующий цвет
+            colored_mask[i, j, :] = color
+    return colored_mask
 
-        images, mask = x[i], y[i]
-        sample_img = images
-        ax0 = fig.add_subplot(gs[i, 0])
-        im = ax0.imshow(sample_img)
 
-        ax1 = fig.add_subplot(gs[i, 1])
-        if (flag == False):
-            flag = True
-            ax0.set_title("Image", fontsize=15, weight='bold', y=1.02)
-            ax1.set_title("Mask", fontsize=15, weight='bold', y=1.02)
-            plt.legend(handles=patches, bbox_to_anchor=(1.1, 0.65), loc=2, borderaxespad=0.4, fontsize=14,
-                       title='Mask Labels', title_fontsize=14, edgecolor="black", facecolor='#c5c6c7')
+def vizualizator(gen):
+    x, y = next(gen)
+    for i in range(len(x)):
+        image = x[i]
+        mask = y[i]
+        fig, (ax1, ax2) = plt.subplots(ncols=2, figsize=(10, 5))
+        ax1.imshow(image)
+        ax1.axis('off')
 
-        l0 = ax1.imshow(sample_img)
-        listMasks = []
-        for i in range(len(mask[0, 0, :])):
-            mask_one = mask[:, :, i]
-            l = ax1.imshow(np.ma.masked_where(
-                mask_one == False, mask_one), cmap=mpl.colors.ListedColormap(colors[i]), alpha=0.6)
-            listMasks.append(l)
-
-        colors = [im.cmap(im.norm(1)) for im in listMasks]
-
-    plt.subplots_adjust(left=0.11, bottom=0.08, right=0.3,
-                        top=0.92, wspace=0.01, hspace=0.08)
-    plt.show()
+        color_mask111 = visualize_mask2(mask=mask)
+        ax2.imshow(color_mask111)
+        ax2.axis('off')
+        plt.show()
 
 
 from keras import backend as K
+
+
+def dice_loss1111(y_true, y_pred, smooth=1):
+    numerator = 2 * tf.reduce_sum(y_true * y_pred, axis=(1, 2, 3))
+    denominator = tf.reduce_sum(y_true + y_pred, axis=(1, 2, 3))
+    return 1 - ((numerator + smooth) / (denominator + smooth))
 
 
 def show_mask_true_and_predict():
@@ -74,17 +124,18 @@ def show_mask_true_and_predict():
                                                               percent_valid=0,
                                                               # path_folder='test'
                                                               )
-    paths_m = os.path.join(MODEL_H5_PATH, 'model_1_0_10.h5')
+
+    paths_m = os.path.join(MODEL_H5_PATH, 'model_1_0_19.h5')
 
     iou1111 = MyMeanIOU(num_classes=len(classes),
                         # ignore_class=0
                         )
-    model = load_model(paths_m, custom_objects={'dice_loss': dice_loss,
-                                                'MyMeanIOU': iou1111,
-                                                # 'dice_coef': dice_coef,
-                                                # 'jaccard_coef': jaccard_coef
-                                                })
-    # model = load_model(model)
+
+    model = load_model(paths_m, custom_objects={
+        'MyMeanIOU': iou1111,
+        'dice_loss': dice_loss1111,
+    })
+
     for j in range(1):
         train_generator_class = cocoDataGenerator(images_train,
                                                   classes=classes,
@@ -93,64 +144,14 @@ def show_mask_true_and_predict():
                                                   input_image_size=(128, 128),
                                                   batch_size=4)
 
-        aug_gen = augmentationsGenerator(train_generator_class)
-
         img_s, mask_s = next(train_generator_class)
         res = model.predict(img_s)
-        fig = plt.figure(figsize=(10, 25))
-        gs = gridspec.GridSpec(nrows=len(img_s), ncols=4)
-        colors = ['#ffccff', '#D84B20', '#8F8F8F', '#6D6552', '#4E5754', '#6C4675', '#969992', '#9E9764','#0000ff', '#ff0066', '#66ff33', '#ffff00', '#969992', '#9E9764',]
-        patches = [mpatches.Patch(
-            color=colors[i], label=f"{classes[i]}") for i in range(len(classes))]
+        for i in range(len(res)):
+            for j in range(len(res[i, 0, 0, :])):
 
-        flag = False
-        for i in range(0, len(img_s)):
-            images, mask = img_s[i], mask_s[i]
-            sample_img = images
-            ax0 = fig.add_subplot(gs[i, 0])
-            im = ax0.imshow((sample_img * 255).astype(np.uint8))
-            ax1 = fig.add_subplot(gs[i, 1])
-            ax2 = fig.add_subplot(gs[i, 2])
-            if (flag == False):
-                flag = True
-                ax0.set_title("Image", fontsize=15, weight='bold', y=1.02)
-                ax1.set_title("Mask", fontsize=15, weight='bold', y=1.02)
-                ax2.set_title("predicted Mask", fontsize=15, weight='bold', y=1.02)
-                plt.legend(handles=patches, bbox_to_anchor=(1.1, 0.65), loc=2, borderaxespad=0.4, fontsize=14,
-                           title='Mask Labels', title_fontsize=14, edgecolor="black", facecolor='#c5c6c7')
-
-
-            l0 = ax1.imshow(sample_img)
-            listMasks = []
-            listMasksPredict = []
-            l0 = ax2.imshow(sample_img)
-            for m in range(len(mask[0, 0, :])):
-                mask_one = mask[:, :, m]
-                l = ax1.imshow(np.ma.masked_where(
-                    mask_one == False, mask_one), cmap=mpl.colors.ListedColormap(colors[m]), alpha=1)
-                listMasks.append(l)
-
-
-            pre = res[i]
-            print(pre.shape)
-            for i in range(len(pre[0, 0, :])):
-                # print(i)
-                res_one = (pre[:, :, i] > 0.5).astype(np.float32)
-                res_one = np.array(res_one)
-                pass
-                l = ax2.imshow(np.ma.masked_where(
-                    res_one == False, res_one), cmap=mpl.colors.ListedColormap(colors[i]), alpha=1)
-                listMasksPredict.append(l)
-
-
-
-            _ = [ax.set_axis_off() for ax in [ax0, ax1]]
-
-            colors = [im.cmap(im.norm(1)) for im in listMasks]
-            colors2 = [im.cmap(im.norm(1)) for im in listMasksPredict]
-            # colors = [im.cmap(im.norm(1)) for im in [l1, l2, l3, l4, l5, l6, l7, l8, l9, l10, l11, l12]]
-
-        plt.show()
+                plt.imshow(res[i, :, :, j], alpha=0.4)
+            plt.show()
+        print(res.shape)
 
 
 palette = {
@@ -197,7 +198,7 @@ def pppppppppp():
     iou1111 = MyMeanIOU(num_classes=len(classes)
                         # , ignore_class=0
                         )
-    model = load_model(paths_m, custom_objects={'dice_loss': dice_loss,
+    model = load_model(paths_m, custom_objects={'dice_loss': dice_loss1111,
                                                 'MyMeanIOU': iou1111,
                                                 # 'dice_coef': dice_coef,
                                                 # 'jaccard_coef': jaccard_coef

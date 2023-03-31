@@ -1,6 +1,7 @@
 import os
 import random
 from pycocotools.coco import COCO
+from definitions import ANNOTATION_FILE_PATH_VALID_IMAGE
 
 from definitions import DATASET_PATH
 
@@ -45,8 +46,8 @@ def filterDataset(ann_file_path, classes=None, mode='train', percent_valid=50, p
         for image_one in l:
             imagePath = DATASET_PATH + '/' + image_one['file_name']
             if path_folder is not None:
-                imagePath = os.path.join(DATASET_PATH, path_folder)
-                imagePath = os.path.join(imagePath, image_one['file_name'])
+                # imagePath = os.path.join(DATASET_PATH, path_folder)
+                imagePath = os.path.join(ANNOTATION_FILE_PATH_VALID_IMAGE, image_one['file_name'])
             if os.path.exists(imagePath):
                 valid_files.append(image_one)
         group_class.append(valid_files)
