@@ -6,6 +6,7 @@ from definitions import TENSORBOARD_LOGS
 from model.model_history import ModelHistory
 
 
+
 class callback_bce_dice_loss():
 
     def __init__(self,
@@ -21,6 +22,9 @@ class callback_bce_dice_loss():
 
     def tb_callback(self):
         return tf.keras.callbacks.TensorBoard(TENSORBOARD_LOGS, update_freq=1)
+
+
+
 
     def checkpoint(self):
         _checkpoint = ModelCheckpoint(
@@ -46,7 +50,7 @@ class callback_bce_dice_loss():
     def early_stopping(self):
         _early_stopping = EarlyStopping(monitor=self.monitor,
                                         min_delta=0.0001,
-                                        patience=20,
+                                        patience=7,
                                         mode=self.mode)
         return _early_stopping
 
@@ -61,6 +65,8 @@ class callback_bce_dice_loss():
     def on_train_end_update(self, logs):
         if self.result_model_history:
             print("Завершено обучение модели")
+
+
 
     def on_train_begin_update(self, logs):
         if self.result_model_history:

@@ -10,7 +10,7 @@ from utils.DataGeneratorFromCocoJson import DataGeneratorFromCocoJson
 from utils.build_model import unet_model
 from utils.get_dataset_coco import filterDataset
 from utils.model_train import train_model
-from utils.vizualizators import vizualizator, show_mask_true_and_predict, visualize_mask
+from utils.vizualizators import vizualizator, vizualizator_old, show_mask_true_and_predict
 from controller_vgtu_train.subprocess_train_model_controller import get_last_model_history, update_model_history
 from keras.utils.vis_utils import plot_model
 from datetime import datetime
@@ -24,6 +24,7 @@ from utils.newDataGeneratorCoco import cocoDataGenerator, visualizeGenerator, \
 from utils.unet_new import unet_new
 from utils.unet import get_model
 import tensorflow as tf
+from utils.unet_chat_gpt import unet_gpt
 
 
 def main():
@@ -34,14 +35,16 @@ def main():
         print(f'Удалено старых моделей h5 и zip архивов: {check_garbage_files_count}')
     timer = time.time()
 
-    images_train, _, coco, classes_train = filterDataset(ANNOTATION_FILE_PATH,
-                                                         percent_valid=0,
-                                                         # path_folder='train'
-                                                         )
-    images_valid, _, coco, classes_valid = filterDataset(ANNOTATION_FILE_PATH,
-                                                         percent_valid=0,
-                                                         # path_folder='train'
-                                                         )
+    images_train, _, coco_train, classes_train = filterDataset(ANNOTATION_FILE_PATH,
+                                                               percent_valid=0,
+                                                               # path_folder='train'
+                                                               )
+
+    # return 0
+    images_valid, _, coco_valid, classes_valid = filterDataset(ANNOTATION_FILE_PATH,
+                                                               percent_valid=0,
+                                                               # path_folder='train'
+                                                               )
 
     # images_valid, _, coco_valid, classes_valid = filterDataset(ANNOTATION_FILE_PATH_VALID,
     #                                                            percent_valid=0,
@@ -55,53 +58,71 @@ def main():
     print(f'РАЗМЕР ДАТАСЕТА ДЛЯ ОБУЧЕНИЯ - : {len(images_train)}')
     print(f'РАЗМЕР ДАТАСЕТА ДЛЯ ВАЛИДАЦИИ - : {len(images_valid)}')
 
-    h, w, n_c = 128, 128, len(classes_train)
+    # h, w, n_c = 128, 128, len(classes_train)
+
+    # print(h, w, n_c)
 
     input_image_size = (128, 128)
     # for i in range(10):
-    batch_size = 4
+    batch_size = 8
 
     train_gen = cocoDataGenerator(images_train,
                                   classes_train,
-                                  coco,
+                                  coco_train,
                                   # folder='train',
                                   mask_type="normal",
                                   input_image_size=input_image_size,
                                   batch_size=batch_size,
                                   shuffle=False)
 
-    # val_gen = cocoDataGenerator(images_valid,
-    #                             classes_train,
-    #                             coco,
-    #                             # folder='train',
-    #                             mask_type="normal",
-    #                             input_image_size=input_image_size,
-    #                             batch_size=batch_size,
-    #                             shuffle=False)
+    val_gen = cocoDataGenerator(images_valid,
+                                classes_train,
+                                coco_valid,
+                                # folder='train',
+                                mask_type="normal",
+                                input_image_size=input_image_size,
+                                batch_size=batch_size,
+                                shuffle=False)
 
     aug_gen_train = augmentationsGenerator(train_gen, 'train')
+    aug_gen_val = augmentationsGenerator(val_gen, 'val')
 
+
+    data1, data2 = next(aug_gen_train)
+    data3, data4 = next(train_gen)
+    # return 0
+    print()
     # aug_gen_val = augmentationsGenerator(val_gen, 'val')
     # img, mask = next(train_gen)
 
     # for i in range(len(mask[:, 0, 0, 0])):
     #     visualize_mask(mask[i])
 
-    # visualizeGenerator(aug_gen_train)
-    # visualizeGenerator(aug_gen_val)
+    visualizeGenerator(aug_gen_train)
+    visualizeGenerator(aug_gen_val)
 
-    # vizualizator(aug_gen_train)
+
+
+    vizualizator_old(val_gen, classes_train)
+    vizualizator_old(aug_gen_train, classes_train)
+    return 0
     # return 0
-
 
     # return 0
     # vizualizator(aug_gen_val, classes_train)
-    model = unet_new((128, 128, 3))
+    # model = unet_model(len(classes_train))
     # model = get_model(img_size=(128, 128, 3),
     #                   num_classes=len(classes_train))
-    tf.keras.utils.plot_model(model, to_file='model_plot.png', show_shapes=True, show_layer_names=True)
+    # tf.keras.utils.plot_model(model, to_file='model_plot.png', show_shapes=True, show_layer_names=True)
 
     # print(model.summary())
+
+
+    #Вроде норм обучается
+    model = get_model((128, 128, 3), num_classes=len(classes_train))
+
+
+    # model = unet_gpt((128, 128, 3), num_classes=len(classes_train))
 
     path_model = os.path.join(MODEL_H5_PATH, MODEL_H5_FILE_NAME)
     model_history = get_last_model_history()
@@ -113,8 +134,8 @@ def main():
                           model=model,
                           n_epoch=500,
                           batch_size=batch_size,
-                          dataset_train=train_gen,
-                          dataset_valid=train_gen,
+                          dataset_train=aug_gen_train,
+                          dataset_valid=val_gen,
                           dataset_size_train=len(images_train),
                           dataset_size_val=len(images_valid),
                           model_history=model_history,

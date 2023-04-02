@@ -11,12 +11,10 @@ class MyMeanIOU(tf.keras.metrics.MeanIoU):
     def update_state(self, y_true, y_pred, sample_weight=None):
         return super().update_state(tf.argmax(y_true, axis=-1), tf.argmax(y_pred, axis=-1), sample_weight)
 
-
-
-def dice_loss(y_true, y_pred, smooth=1):
-    numerator = 2 * tf.reduce_sum(y_true * y_pred, axis=(1, 2, 3))
-    denominator = tf.reduce_sum(y_true + y_pred, axis=(1, 2, 3))
-    return 1 - ((numerator + smooth) / (denominator + smooth))
+def dice_loss(y_true, y_pred):
+    numerator = tf.reduce_sum(y_true * y_pred)
+    denominator = tf.reduce_sum(y_true * y_true) + tf.reduce_sum(y_pred * y_pred) - tf.reduce_sum(y_true * y_pred)
+    return 1 - numerator / denominator
 
 def focal_loss(gamma=2., alpha=.25):
     def focal_loss_fixed(y_true, y_pred):
@@ -70,6 +68,7 @@ def unet_new(input_size=(128, 128, 3)):
 
     model = Model(inputs=inputs, outputs=outputs)
     iou = MyMeanIOU(num_classes=12)
+
     model.compile(optimizer=Adam(learning_rate=1e-4), loss=dice_loss,
                   metrics=[iou])
     return model

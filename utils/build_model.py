@@ -16,19 +16,28 @@ def dice_loss(y_true, y_pred):
     return 1 - numerator / denominator
 
 
+def jaccard_loss(y_true, y_pred):
+    intersection = K.sum(K.abs(y_true * y_pred), axis=-1)
+    sum_ = K.sum(K.abs(y_true) + K.abs(y_pred), axis=-1)
+    iou = (intersection + 1e-15) / (sum_ - intersection + 1e-15)
+    return 1 - iou
+
+
+
+
 def unet_model(num_classes: int):
     print(num_classes)
     model = custom_unet(
         input_shape=(128, 128, 3),
-        use_batch_norm=False,
+        use_batch_norm=True,
         num_classes=num_classes,
         filters=32,
         num_layers=4,
-        dropout=0.2,
+        dropout=0.3,
         activation="relu",
         output_activation='softmax'
     )
     iou = MyMeanIOU(num_classes=num_classes)
     # loss = binary_weighted_cross_entropy(beta=0.9, is_logits=True)
-    model.compile(optimizer='adam', loss=dice_loss, metrics=[iou, 'accuracy'])
+    model.compile(optimizer='adam', loss=jaccard_loss, metrics=[iou, 'accuracy'])
     return model

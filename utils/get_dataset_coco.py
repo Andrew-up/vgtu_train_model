@@ -6,7 +6,7 @@ from definitions import ANNOTATION_FILE_PATH_VALID_IMAGE
 from definitions import DATASET_PATH
 
 
-def filterDataset(ann_file_path, classes=None, mode='train', percent_valid=50, path_folder=None):
+def filterDataset(ann_file_path, classes=None, mode='train', percent_valid=50, path_folder=None, shuffie=True):
 
     # initialize COCO api for instance annotations
     annFile = ann_file_path
@@ -18,21 +18,32 @@ def filterDataset(ann_file_path, classes=None, mode='train', percent_valid=50, p
     if classes != None:
         # iterate for each individual class in the list
         for className in classes:
+
             # get all images containing given categories
             catIds = coco.getCatIds(catNms=className)
             imgIds = coco.getImgIds(catIds=catIds)
             images += coco.loadImgs(imgIds)
 
+
+
     else:
         imgIds = coco.getImgIds()
         images = coco.loadImgs(imgIds)
 
-    # Now, filter out the repeated images
-    if classes is None:
-        classes = list()
-        for i in coco.cats:
-            name = coco.cats[i]['name']
-            classes.append(name)
+
+    classes = []
+    classes2 = set()
+    img_ids = coco.getImgIds()
+    for img_id in img_ids:
+        ann_ids = coco.getAnnIds(imgIds=[img_id])
+        anns = coco.loadAnns(ann_ids)
+        img_classes = [ann['category_id'] for ann in anns]
+        classes2.update(img_classes)
+
+    for class_id in classes2:
+        class_name = coco.loadCats(class_id)[0]['name']
+        classes.append(class_name)
+        print(f'{class_id}: {class_name}')
 
     unique_images = []
 
@@ -117,9 +128,10 @@ def filterDataset(ann_file_path, classes=None, mode='train', percent_valid=50, p
     #         unique_images.append(images[i])
 
     # print(len(images_train_unique))
-    random.shuffle(images_train_unique)
-    # print(len(images_train_unique))
-    random.shuffle(images_valid_unique)
+    if shuffie:
+        random.shuffle(images_train_unique)
+        # print(len(images_train_unique))
+        random.shuffle(images_valid_unique)
 
     if classes is not None:
         return images_train_unique, images_valid_unique, coco, classes

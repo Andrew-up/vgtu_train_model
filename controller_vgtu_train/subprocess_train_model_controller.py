@@ -15,7 +15,7 @@ def get_last_model_history():
 
 def update_model_history(data: ModelHistory):
     url_string = f'{API}update/'
-    print(data.__dict__)
+    # print(data.__dict__)
     data_json = json.dumps(data.__dict__)
     r = requests.post(url_string, data=data_json, headers={"Content-Type": "application/json"})
     # print(r.request.headers)
@@ -23,7 +23,7 @@ def update_model_history(data: ModelHistory):
     # print(r.request.hooks)
     # print(r.request.method)
     # # print(r.url)
-    print(r.text)
+    # print(r.text)
 
 # def add_history_model(data: ModelHistory):
 #     url_string = f'{API}add/'
