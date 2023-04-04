@@ -13,7 +13,7 @@ from utils.helpers import delete_legacy_models_and_zip
 from utils.model_losses import plot_segm_history
 from utils.model_train import train_model
 from utils.newDataGeneratorCoco import cocoDataGenerator, augmentationsGenerator, visualizeImageOrGenerator
-from utils.unet import get_model, unet123123ttt
+from utils.unet import get_model
 import tensorflow as tf
 from utils.DataGeneratorFromCocoJson import DataGeneratorFromCocoJson
 
@@ -40,14 +40,17 @@ def main():
                                                                # path_folder='train'
                                                                )
 
-    train_gen = NEWJSON_COCO_GENERATOR(batch_size=8, image_list=images_train, coco=coco_train, path_folder=DATASET_PATH, classes=classes_train)
-    train_val = NEWJSON_COCO_GENERATOR(batch_size=8, image_list=images_train, coco=coco_train, path_folder=DATASET_PATH, classes=classes_train)
+    train_gen = NEWJSON_COCO_GENERATOR(batch_size=4, image_list=images_train, coco=coco_train, path_folder=DATASET_PATH, classes=classes_train)
+    train_val = NEWJSON_COCO_GENERATOR(batch_size=4, image_list=images_valid, coco=coco_valid, path_folder=DATASET_PATH, classes=classes_valid)
 
-    # print(next(train_gen))
-    # return 0
-    # for i in range(5):
+
+    train_gen[0]
+    return 0
+    # for i in range(10):
     #     visualizeImageOrGenerator(gen=train_gen)
-    # visualizeImageOrGenerator(gen=train_gen)
+        # print(i)
+    # return 0
+
     # return 0
 
     # images_valid, _, coco_valid, classes_valid = filterDataset(ANNOTATION_FILE_PATH_VALID,
@@ -60,7 +63,7 @@ def main():
     # images_test, _, coco, classes = filterDataset(ANNOTATION_FILE_PATH_TEST, percent_valid=0)
 
     print(f'РАЗМЕР ДАТАСЕТА ДЛЯ ОБУЧЕНИЯ - : {len(images_train)}')
-    print(f'РАЗМЕР ДАТАСЕТА ДЛЯ ВАЛИДАЦИИ - : {len(images_valid)}')
+    # print(f'РАЗМЕР ДАТАСЕТА ДЛЯ ВАЛИДАЦИИ - : {len(images_valid)}')
 
     input_image_size = (128, 128)
     batch_size = 4
@@ -70,7 +73,7 @@ def main():
 
     # Вроде норм обучается
     model = get_model((input_image_size[0], input_image_size[1], 3), num_classes=len(classes_train))
-    tf.keras.utils.plot_model(model, to_file='model_plot.png', show_shapes=True, show_layer_names=True)
+    # tf.keras.utils.plot_model(model, to_file='model_plot.png', show_shapes=True, show_layer_names=True)
 
     path_model = os.path.join(MODEL_H5_PATH, MODEL_H5_FILE_NAME)
     model_history = get_last_model_history()
