@@ -1,24 +1,16 @@
 import os.path
-import random
-
-import cv2
-import keras.utils
-from matplotlib import gridspec, pyplot as plt, colors
-import matplotlib.patches as mpatches
-import matplotlib as mpl
-import numpy as np
-from keras.models import Model, load_model
-import tensorflow as tf
-from keras.utils import img_to_array
-
-from definitions import ANNOTATION_FILE_PATH, DATASET_PATH, MODEL_H5_PATH, ANNOTATION_FILE_PATH_TRAIN
-from utils.DataGeneratorFromCocoJson import DataGeneratorFromCocoJson
-from utils.newDataGeneratorCoco import cocoDataGenerator, augmentationsGenerator, visualizeGenerator
-from utils.get_dataset_coco import filterDataset
-from utils.model_losses import bce_dice_loss, \
-    binary_weighted_cross_entropy, dice_coef
 
 import keras.backend as K
+import matplotlib as mpl
+import matplotlib.patches as mpatches
+import numpy as np
+import tensorflow as tf
+from keras.models import Model, load_model
+from matplotlib import gridspec, pyplot as plt
+
+from definitions import ANNOTATION_FILE_PATH, MODEL_H5_PATH
+from utils.get_dataset_coco import filterDataset
+from utils.newDataGeneratorCoco import cocoDataGenerator, augmentationsGenerator
 
 
 class MeanDiceCoefficient(tf.keras.metrics.Metric):
@@ -51,25 +43,6 @@ class MyMeanIOU(tf.keras.metrics.MeanIoU):
     def update_state(self, y_true, y_pred, sample_weight=None):
         return super().update_state(tf.argmax(y_true, axis=-1), tf.argmax(y_pred, axis=-1), sample_weight)
 
-
-colors_dict = {
-    0: [0, 0, 0],  # Черный
-    1: [0, 255, 0],  # Зеленый
-    2: [0, 0, 255],  # Синий
-    3: [255, 255, 0],  # Желтый
-    4: [0, 255, 255],  # Бирюзовый
-    5: [128, 0, 128],  # Фиолетовый
-    6: [255, 165, 0],  # Оранжевый
-    7: [255, 192, 203],  # Розовый
-    8: [128, 128, 128],  # Серый
-    9: [165, 42, 42],  # Коричневый
-    10: [128, 128, 0],  # Оливковый
-    11: [0, 255, 0],  # Лайм
-    12: [0, 128, 128],  # Морской волны
-    13: [255, 255, 255],  # Белый
-    14: [255, 0, 0]  # Красный
-
-}
 
 color_map__tf = tf.constant([
     [0, 0, 0],  # Канал 0 (фон) - черный цвет
@@ -178,11 +151,45 @@ class IOU(tf.keras.metrics.MeanIoU):
         super(IOU, self).update_state(y_true, y_pred, sample_weight)
 
 
+colors_dict = {
+    0: [0, 0, 0],  # фон
+    1: [0, 255, 0],  # Зеленый
+    2: [0, 0, 255],  # Синий
+    3: [255, 255, 0],  # Желтый
+    4: [0, 255, 255],  # Бирюзовый
+    5: [128, 0, 128],  # Фиолетовый
+    6: [255, 165, 0],  # Оранжевый
+    7: [255, 192, 203],  # Розовый
+    8: [128, 128, 128],  # Серый
+    9: [165, 42, 42],  # Коричневый
+    10: [128, 128, 0],  # Оливковый
+    11: [0, 255, 0],  # Лайм
+    12: [0, 128, 128],  # Морской волны
+    13: [255, 255, 255],  # Белый
+    14: [0, 0, 0]  # Черный
+}
+
+
+def color_mask(mask):
+    # Создаем пустой массив для раскрашенной маски
+    colored_mask = np.zeros((mask.shape[0], mask.shape[1], 3), dtype=np.uint8)
+    # Создаем словарь с цветами для каждого класса
+    for i in range(mask.shape[0]):
+        for j in range(mask.shape[1]):
+            # Получаем класс текущего пикселя
+            cls = mask[i, j, 0]
+            # Получаем цвет для данного класса из словаря
+            color = colors_dict[cls]
+            # Раскрашиваем пиксель в соответствующий цвет
+            colored_mask[i, j, :] = color
+    return colored_mask
+
+
 def vizualizator_old(gen, classes):
     x, y = next(gen)
     fig = plt.figure(figsize=(50, 40))
     gs = gridspec.GridSpec(nrows=len(x), ncols=2)
-    colors = ['#0044ff', '#ff00fb', '#ff0000', '#2bff00', '#474B4E', '#D84B20', '#8F8F8F', '#6D6552', '#4E5754',
+    colors = ['#00FF00', '#0000FF', '#FFFF00', '#00FFFF', '#474B4E', '#D84B20', '#8F8F8F', '#6D6552', '#4E5754',
               '#6C4675', '#969992', '#9E9764']
     labels = classes
     patches = [mpatches.Patch(
@@ -199,25 +206,17 @@ def vizualizator_old(gen, classes):
         ax1 = fig.add_subplot(gs[i, 1])
         if (flag == False):
             flag = True
-            ax0.set_title("Image", fontsize=15, weight='bold', y=1.02)
-            ax1.set_title("Mask", fontsize=15, weight='bold', y=1.02)
+            ax0.set_title("Image", fontsize=25, weight='bold', y=1.02)
+            ax1.set_title("Mask", fontsize=25, weight='bold', y=1.02)
             plt.legend(handles=patches, bbox_to_anchor=(1.1, 0.65), loc=2, borderaxespad=0.4, fontsize=14,
                        title='Mask Labels', title_fontsize=14, edgecolor="black", facecolor='#c5c6c7')
 
-        l0 = ax1.imshow(sample_img)
-        listMasks = []
-        for i in range(len(mask[0, 0, :])):
-            mask_one = mask[:, :, i]
-            l = ax1.imshow(np.ma.masked_where(
-                mask_one == False, mask_one), cmap=mpl.colors.ListedColormap(colors[i]), alpha=1)
-            listMasks.append(l)
+        ax1.imshow(color_mask(mask))
 
-        colors = [im.cmap(im.norm(1)) for im in listMasks]
 
     plt.subplots_adjust(left=0.11, bottom=0.08, right=0.3,
                         top=0.92, wspace=0.01, hspace=0.08)
     plt.show()
-
 
 
 def show_mask_true_and_predict_old2():
@@ -225,14 +224,14 @@ def show_mask_true_and_predict_old2():
                                                               percent_valid=0,
                                                               # path_folder='test'
                                                               )
-    paths_m = os.path.join(MODEL_H5_PATH, 'model_1_0_20.h5')
+    paths_m = os.path.join(MODEL_H5_PATH, 'model_1_0_19.h5')
 
     dddd = MyMeanIOU(num_classes=3)
     model = load_model(paths_m, custom_objects={
-                                                'dice_loss': dice_loss,
-                                                'MyMeanIOU': dddd,
-                                                # 'dice_coef': dice_coef,
-                                                # 'jaccard_coef': jaccard_coef
+        'dice_loss': dice_loss,
+        'MyMeanIOU': dddd,
+        # 'dice_coef': dice_coef,
+        # 'jaccard_coef': jaccard_coef
     })
 
     # model = load_model(model)
@@ -341,30 +340,6 @@ def vizualizator(gen):
     show_images_with_masks(images=np.array(x), masks=np.array(y))
 
 
-def dice_loss1111(y_true, y_pred, smooth=1):
-    numerator = 2 * tf.reduce_sum(y_true * y_pred, axis=(1, 2, 3))
-    denominator = tf.reduce_sum(y_true + y_pred, axis=(1, 2, 3))
-    return 1 - ((numerator + smooth) / (denominator + smooth))
-
-
-def create_mask(pred_mask):
-    pred_mask = np.argmax(pred_mask, axis=-1)
-    mask = pred_mask[:, :, np.newaxis]
-    return mask
-
-
-def display(display_list):
-    plt.figure(figsize=(15, 15))
-    title = ['Input Image', 'True Mask', 'Predicted Mask']
-
-    for i in range(len(display_list)):
-        plt.subplot(1, len(display_list), i + 1)
-        plt.title(title[i])
-        plt.imshow(tf.keras.utils.array_to_img(display_list[i]))
-        plt.axis('off')
-    plt.show()
-
-
 def show_mask_true_and_predict():
     images_train, images_valid, coco, classes = filterDataset(ANNOTATION_FILE_PATH,
                                                               percent_valid=0,
@@ -423,12 +398,11 @@ def pppppppppp():
 
     dddd = MyMeanIOU(num_classes=3)
     model = load_model(paths_m, custom_objects={
-                                                'dice_loss': dice_loss,
-                                                'MyMeanIOU': dddd,
-                                                # 'dice_coef': dice_coef,
-                                                # 'jaccard_coef': jaccard_coef
+        'dice_loss': dice_loss,
+        'MyMeanIOU': dddd,
+        # 'dice_coef': dice_coef,
+        # 'jaccard_coef': jaccard_coef
     })
-
 
     # train_generator_class = DataGeneratorFromCocoJson(batch_size=6,
     #                                                   # path_folder='test',
@@ -503,10 +477,10 @@ def viz_model():
     paths_m = os.path.join(MODEL_H5_PATH, 'model_1_0_20.h5')
     dddd = MyMeanIOU(num_classes=3)
     model = load_model(paths_m, custom_objects={
-                                                'dice_loss': dice_loss,
-                                                'MyMeanIOU': dddd,
-                                                # 'dice_coef': dice_coef,
-                                                # 'jaccard_coef': jaccard_coef
+        'dice_loss': dice_loss,
+        'MyMeanIOU': dddd,
+        # 'dice_coef': dice_coef,
+        # 'jaccard_coef': jaccard_coef
     })
 
     train_generator_class = cocoDataGenerator(images_train,
@@ -548,36 +522,37 @@ def viz_model():
     plt.show()
 
 
-def color_mask(mask):
-    # Создаем пустой массив для раскрашенной маски
-    colored_mask = np.zeros((mask.shape[0], mask.shape[1], 3), dtype=np.uint8)
-    # Создаем словарь с цветами для каждого класса
-    colors_dict = {
-        0: [0, 0, 0],  # Черный
-        1: [255, 255, 255],  # Белый
-        2: [255, 0, 0],  # Красный
-        3: [0, 255, 0],  # Зеленый
-        4: [0, 0, 255],  # Синий
-        5: [255, 255, 0],  # Желтый
-        6: [255, 0, 255],  # Розовый
-        7: [0, 255, 255],  # Бирюзовый
-        8: [128, 0, 0],  # Темно-красный
-        9: [0, 128, 0],  # Темно-зеленый
-        10: [0, 0, 128],  # Темно-синий
-        11: [128, 128, 128]  # Серый
-    }
-    # print(mask.shape)
-    # Проходимся по всем пикселям маски
-    for i in range(mask.shape[0]):
-        for j in range(mask.shape[1]):
-            # Получаем класс текущего пикселя
-            cls = mask[i, j, 0]
-            # print(cls)
-            # Получаем цвет для данного класса из словаря
-            color = colors_dict[cls]
-            # Раскрашиваем пиксель в соответствующий цвет
-            colored_mask[i, j, :] = color
-    return colored_mask
+# def color_mask(mask):
+#     # Создаем пустой массив для раскрашенной маски
+#     # print('1111111111111111')
+#     colored_mask = np.zeros((mask.shape[0], mask.shape[1], 3), dtype=np.uint8)
+#     # Создаем словарь с цветами для каждого класса
+#     colors_dict = {
+#         0: [0, 0, 0],  # Черный
+#         1: [255, 255, 255],  # Белый
+#         2: [255, 0, 0],  # Красный
+#         3: [0, 255, 0],  # Зеленый
+#         4: [0, 0, 255],  # Синий
+#         5: [255, 255, 0],  # Желтый
+#         6: [255, 0, 255],  # Розовый
+#         7: [0, 255, 255],  # Бирюзовый
+#         8: [128, 0, 0],  # Темно-красный
+#         9: [0, 128, 0],  # Темно-зеленый
+#         10: [0, 0, 128],  # Темно-синий
+#         11: [128, 128, 128]  # Серый
+#     }
+#     # print(mask.shape)
+#     # Проходимся по всем пикселям маски
+#     for i in range(mask.shape[0]):
+#         for j in range(mask.shape[1]):
+#             # Получаем класс текущего пикселя
+#             cls = mask[i, j, 0]
+#             # print(cls)
+#             # Получаем цвет для данного класса из словаря
+#             color = colors_dict[cls]
+#             # Раскрашиваем пиксель в соответствующий цвет
+#             colored_mask[i, j, :] = color
+#     return colored_mask
 
 
 def test():
@@ -616,6 +591,6 @@ if __name__ == "__main__":
     #     # test()
     # pppppppppp()
     # main()
-    viz_model()
+    # viz_model()
     # show_mask_true_and_predict()
     show_mask_true_and_predict_old2()

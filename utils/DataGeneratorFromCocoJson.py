@@ -56,30 +56,32 @@ class DataGeneratorFromCocoJson(tf.keras.utils.Sequence):
         anns = self.coco.loadAnns(annIds)
         # print(anns)
         cats = self.coco.loadCats(catIds)
-        train_mask = np.zeros(self.input_image_size, dtype=np.uint8)
+        train_mask = np.zeros(self.input_image_size)
         for a in range(len(anns)):
             className = self.getClassName(anns[a]['category_id'], cats)
             pixel_value = self.classes.index(className) + 1
             new_mask = cv2.resize(self.coco.annToMask(
                 anns[a]) * pixel_value, self.input_image_size)
             train_mask = np.maximum(new_mask, train_mask)
-
+        plt.imshow(train_mask)
+        plt.show()
+        print('Unique pixel values in the mask are:', np.unique(train_mask))
         return train_mask
 
-    def getLevelsMask(self, image_id):
-        # for each category , we get the x mask and add it to mask list
-        res = []
-        for j, categorie in enumerate(self.catIds):
-            mask = self.getNormalMask(image_id, categorie)
-            res.append(mask)
-
-        return res
+    # def getLevelsMask(self, image_id):
+    #     # for each category , we get the x mask and add it to mask list
+    #     res = []
+    #     for j, categorie in enumerate(self.catIds):
+    #         mask = self.getNormalMask(image_id, categorie)
+    #         res.append(mask)
+    #
+    #     return res
 
     def getImage(self, file_path):
         train_img = cv2.imread(file_path, cv2.IMREAD_COLOR)
         # train_img = cv2.cvtColor(train_img, cv2.COLOR_BGR2RGB)
         train_img = cv2.resize(train_img, (self.input_image_size))
-        train_img = train_img.astype(np.float32) / 255.
+        # train_img = train_img.astype(np.float32) / 255.
         if (len(train_img.shape) == 3 and train_img.shape[2] == 3):
             return train_img
         else:
@@ -92,10 +94,6 @@ class DataGeneratorFromCocoJson(tf.keras.utils.Sequence):
         if self.path_folder_image is not None:
             pass
             imagePath = f'{DATASET_PATH}/{self.path_folder_image}/{image["file_name"]}'
-
-            # print('folder is not none')
-            # print(imagePath)
-        # print(imagePath)
         return imagePath
 
     def flip_random(self, img, mask):
@@ -151,6 +149,10 @@ class DataGeneratorFromCocoJson(tf.keras.utils.Sequence):
         np.array(img_list, dtype=np.uint8)
         return np.array(img_list)
 
+    def normalize(self, input_image, input_mask):
+        input_image = tf.cast(input_image, tf.float32) / 255.0
+        input_mask -= 1
+        return input_image, input_mask
     def __getitem__(self, index):
         X = np.empty((self.batch_size, 128, 128, 3))
         y = np.empty((self.batch_size, 128, 128, len(self.classes)))
@@ -159,17 +161,18 @@ class DataGeneratorFromCocoJson(tf.keras.utils.Sequence):
             value = indexes[i]
             img_info = self.image_list[value]
             img = self.getImage(self.getImagePathByCocoId(img_info['id']))
-            mask_train = self.getLevelsMask(img_info['id'])
+            mask_train = self.getNormalMask(img_info['id'], self.catIds)
+            print(mask_train.shape)
             X[i,] = img
-            X[i,] = self.edit_background(X[i,], mask_train)
-            X[i,], mask_train = self.flip_random(X[i,], mask_train)
-            X[i,], mask_train = self.rot90_random(X[i,], mask_train)
+            # X[i,] = self.edit_background(X[i,], mask_train)
+            # X[i,], mask_train = self.flip_random(X[i,], mask_train)
+            # X[i,], mask_train = self.rot90_random(X[i,], mask_train)
             # X[i, ] = tf.image.random_brightness((X[i, ]*255).astype(np.uint8), 0.2)
             # X[i, ] = tf.image.random_contrast(X[i, ], 0.5, 0.8) / 255
 
             for j in self.catIds:
-                y[i, :, :, j - 1] = mask_train[j - 1]
-
+                y[i, :, :, j-1] = mask_train
+            # yield X, y
             # plt.show()
 
         X = np.array(X)

@@ -50,7 +50,7 @@ class callback_bce_dice_loss():
     def early_stopping(self):
         _early_stopping = EarlyStopping(monitor=self.monitor,
                                         min_delta=0.0001,
-                                        patience=7,
+                                        patience=10,
                                         mode=self.mode)
         return _early_stopping
 

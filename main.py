@@ -1,30 +1,25 @@
 import os.path
 import time
+import zipfile
+from datetime import datetime
 
-import matplotlib.pyplot as plt
-import numpy as np
+from keras_preprocessing.image import ImageDataGenerator
 
-from definitions import MODEL_H5_PATH, ANNOTATION_FILE_PATH, MODEL_H5_FILE_NAME, ANNOTATION_FILE_PATH_VALID_IMAGE, \
-    ANNOTATION_FILE_PATH_TRAIN, ANNOTATION_FILE_PATH_VALID
-from utils.DataGeneratorFromCocoJson import DataGeneratorFromCocoJson
+from controller_vgtu_train.subprocess_train_model_controller import get_last_model_history, update_model_history
+from definitions import MODEL_H5_PATH, ANNOTATION_FILE_PATH, MODEL_H5_FILE_NAME, DATASET_PATH
 from utils.build_model import unet_model
 from utils.get_dataset_coco import filterDataset
-from utils.model_train import train_model
-from utils.vizualizators import vizualizator, vizualizator_old, show_mask_true_and_predict
-from controller_vgtu_train.subprocess_train_model_controller import get_last_model_history, update_model_history
-from keras.utils.vis_utils import plot_model
-from datetime import datetime
-import zipfile
 from utils.helpers import delete_legacy_models_and_zip
 from utils.model_losses import plot_segm_history
-
-from utils.newDataGeneratorCoco import cocoDataGenerator, visualizeGenerator, \
-    augmentationsGenerator
-
-from utils.unet_new import unet_new
-from utils.unet import get_model
+from utils.model_train import train_model
+from utils.newDataGeneratorCoco import cocoDataGenerator, augmentationsGenerator, visualizeImageOrGenerator
+from utils.unet import get_model, unet123123ttt
 import tensorflow as tf
-from utils.unet_chat_gpt import unet_gpt
+from utils.DataGeneratorFromCocoJson import DataGeneratorFromCocoJson
+
+from utils.CocoGenerator_new import NEWJSON_COCO_GENERATOR
+
+from utils.vizualizators import vizualizator_old
 
 
 def main():
@@ -40,11 +35,20 @@ def main():
                                                                # path_folder='train'
                                                                )
 
-    # return 0
     images_valid, _, coco_valid, classes_valid = filterDataset(ANNOTATION_FILE_PATH,
                                                                percent_valid=0,
                                                                # path_folder='train'
                                                                )
+
+    train_gen = NEWJSON_COCO_GENERATOR(batch_size=8, image_list=images_train, coco=coco_train, path_folder=DATASET_PATH, classes=classes_train)
+    train_val = NEWJSON_COCO_GENERATOR(batch_size=8, image_list=images_train, coco=coco_train, path_folder=DATASET_PATH, classes=classes_train)
+
+    # print(next(train_gen))
+    # return 0
+    # for i in range(5):
+    #     visualizeImageOrGenerator(gen=train_gen)
+    # visualizeImageOrGenerator(gen=train_gen)
+    # return 0
 
     # images_valid, _, coco_valid, classes_valid = filterDataset(ANNOTATION_FILE_PATH_VALID,
     #                                                            percent_valid=0,
@@ -58,71 +62,15 @@ def main():
     print(f'РАЗМЕР ДАТАСЕТА ДЛЯ ОБУЧЕНИЯ - : {len(images_train)}')
     print(f'РАЗМЕР ДАТАСЕТА ДЛЯ ВАЛИДАЦИИ - : {len(images_valid)}')
 
-    # h, w, n_c = 128, 128, len(classes_train)
-
-    # print(h, w, n_c)
-
     input_image_size = (128, 128)
-    # for i in range(10):
-    batch_size = 8
+    batch_size = 4
 
-    train_gen = cocoDataGenerator(images_train,
-                                  classes_train,
-                                  coco_train,
-                                  # folder='train',
-                                  mask_type="normal",
-                                  input_image_size=input_image_size,
-                                  batch_size=batch_size,
-                                  shuffle=False)
+    # visualizeImageOrGenerator(gen=train_gen)
+    # vizualizator_old(train_gen, classes_train)
 
-    val_gen = cocoDataGenerator(images_valid,
-                                classes_train,
-                                coco_valid,
-                                # folder='train',
-                                mask_type="normal",
-                                input_image_size=input_image_size,
-                                batch_size=batch_size,
-                                shuffle=False)
-
-    aug_gen_train = augmentationsGenerator(train_gen, 'train')
-    aug_gen_val = augmentationsGenerator(val_gen, 'val')
-
-
-    data1, data2 = next(aug_gen_train)
-    data3, data4 = next(train_gen)
-    # return 0
-    print()
-    # aug_gen_val = augmentationsGenerator(val_gen, 'val')
-    # img, mask = next(train_gen)
-
-    # for i in range(len(mask[:, 0, 0, 0])):
-    #     visualize_mask(mask[i])
-
-    visualizeGenerator(aug_gen_train)
-    visualizeGenerator(aug_gen_val)
-
-
-
-    vizualizator_old(val_gen, classes_train)
-    vizualizator_old(aug_gen_train, classes_train)
-    return 0
-    # return 0
-
-    # return 0
-    # vizualizator(aug_gen_val, classes_train)
-    # model = unet_model(len(classes_train))
-    # model = get_model(img_size=(128, 128, 3),
-    #                   num_classes=len(classes_train))
-    # tf.keras.utils.plot_model(model, to_file='model_plot.png', show_shapes=True, show_layer_names=True)
-
-    # print(model.summary())
-
-
-    #Вроде норм обучается
-    model = get_model((128, 128, 3), num_classes=len(classes_train))
-
-
-    # model = unet_gpt((128, 128, 3), num_classes=len(classes_train))
+    # Вроде норм обучается
+    model = get_model((input_image_size[0], input_image_size[1], 3), num_classes=len(classes_train))
+    tf.keras.utils.plot_model(model, to_file='model_plot.png', show_shapes=True, show_layer_names=True)
 
     path_model = os.path.join(MODEL_H5_PATH, MODEL_H5_FILE_NAME)
     model_history = get_last_model_history()
@@ -134,16 +82,16 @@ def main():
                           model=model,
                           n_epoch=500,
                           batch_size=batch_size,
-                          dataset_train=aug_gen_train,
-                          dataset_valid=val_gen,
+                          dataset_train=train_gen,
+                          dataset_valid=train_val,
                           dataset_size_train=len(images_train),
                           dataset_size_val=len(images_valid),
                           model_history=model_history,
-                          monitor='my_mean_iou')
+                          monitor='my_mean_iou',
+                          mode='max'
+                          )
 
     plot_segm_history(history, metrics=['my_mean_iou', 'val_my_mean_iou'])
-
-    # show_mask_true_and_predict()
 
     path_zip = zipfile.ZipFile(f'{os.path.splitext(path_model)[0]}.zip', 'w')
     path_zip.write(path_model, arcname=f'{model_history.name_file}')

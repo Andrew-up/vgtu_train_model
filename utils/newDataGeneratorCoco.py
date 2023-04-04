@@ -6,14 +6,16 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import gridspec
 from definitions import DATASET_PATH, ROOT_DIR, ANNOTATION_FILE_PATH_VALID_IMAGE
-
+import tensorflow as tf
 
 def getNormalMask(coco, image_id, catIds, input_image_size, classes):
     annIds = coco.getAnnIds(image_id, catIds=catIds, iscrowd=None)
     anns = coco.loadAnns(annIds)
-    train_mask = np.zeros(input_image_size, dtype=np.uint8)
+    train_mask = np.zeros(input_image_size)
     for a in range(len(anns)):
-        pixel_value = catIds
+        className = getClassName(anns[a]['category_id'], catIds)
+        print(className)
+        pixel_value = classes.index()
         new_mask = cv2.resize(coco.annToMask(
             anns[a]) * pixel_value, input_image_size)
         train_mask = np.maximum(new_mask, train_mask)
@@ -31,9 +33,11 @@ def getLevelsMask(coco, image_id, catIds, input_image_size):
 
 
 def getImage(file_path, input_image_size):
-    train_img = cv2.imread(file_path, cv2.IMREAD_COLOR)
+    train_img = cv2.imread(file_path, cv2.IMREAD_GRAYSCALE)
     train_img = cv2.resize(train_img, (input_image_size))
     train_img = train_img.astype(np.float32) / 255.
+    # plt.imshow(train_img)
+    # plt.show()
     if (len(train_img.shape) == 3 and train_img.shape[2] == 3):
         return train_img
     else:
@@ -69,7 +73,7 @@ def cocoDataGenerator(images, classes, coco, folder=None,
             listimg.append(imageObj)
             file_path_image = getImagePathByCocoId(coco, image_id=imageObj["id"], folder=folder)
             train_img = getImage(file_path=file_path_image, input_image_size=input_image_size, )
-            mask_train = getLevelsMask(coco, imageObj['id'], catIds, input_image_size)
+            mask_train = getNormalMask(coco, imageObj['id'], catIds, input_image_size, classes=classes)
 
             # print(mask_train.shape)
             mask[i - c, :, :, :] = mask_train
@@ -85,17 +89,20 @@ def cocoDataGenerator(images, classes, coco, folder=None,
         yield img, mask
 
 
-def visualizeGenerator(gen, mode=None):
+def visualizeImageOrGenerator(gen=None, subtitle=None, images_list=None, mask_list=None):
     colors = ['#0044ff', '#ff00fb', '#ff0000', '#2bff00', '#474B4E', '#D84B20', '#8F8F8F', '#6D6552', '#4E5754',
               '#6C4675', '#969992', '#9E9764']
     # Iterate the generator to get image and mask batches
-    img, mask = next(gen)
+    if gen is not None:
+        img, mask = next(gen)
+    else:
+        img, mask = images_list, mask_list
     print()
-    print(f'-{mode}-LEN IMG: {len(img)}')
-    print(f'-{mode}-LEN MASK: {len(mask)}')
+    print(f'-{subtitle}-LEN IMG: {len(img)} {img.shape}')
+    print(f'-{subtitle}-LEN MASK: {len(mask)} {mask.shape}')
     print()
     fig = plt.figure(figsize=(20, 10))
-    fig.suptitle(mode, fontsize=50, fontweight='bold')
+    fig.suptitle(subtitle, fontsize=50, fontweight='bold')
     outerGrid = gridspec.GridSpec(1, 2, wspace=0.1, hspace=0.1)
 
     for i in range(2):
@@ -105,10 +112,8 @@ def visualizeGenerator(gen, mode=None):
             if (i == 1):
                 ax.imshow(img[j])
             else:
-                # print(mask.shape)
-                for m in range(len(mask[0, 0, 0, :])):
-                    mask_one = mask[j, :, :, m]
-                    ax.imshow(mask_one, alpha=0.5)
+                mask_one = mask[j, :, :]
+                ax.imshow(mask_one, alpha=1)
             ax.axis('off')
             fig.add_subplot(ax)
     plt.show()
@@ -204,9 +209,8 @@ def augmentationsGenerator(gen, mode: str = None):
     for img, mask in gen:
         img222, mask222 = add_rotate(img_batch=img.copy(), mask_batch=mask.copy())
         img222, mask222 = add_noise_blur(img222, mask222)
-
         # img222, mask222 = edit_background(img222, mask222)
-
         img_aug = img222.astype(np.float32)
         mask_aug = mask222.astype(np.float32)
+
         yield img_aug, mask_aug
