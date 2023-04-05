@@ -1,28 +1,23 @@
 import os.path
 import random
-import time
 
-import matplotlib.pyplot as plt
-import numpy
-import tensorflow as tf
 import cv2
 import numpy as np
-from PIL import ImageChops, Image, ImageDraw
-from keras_preprocessing.image import ImageDataGenerator
-from matplotlib import cm, gridspec
+import tensorflow as tf
 from pycocotools.coco import COCO
+
 from definitions import DATASET_PATH, ROOT_DIR
-from utils.newDataGeneratorCoco import visualizeImageOrGenerator
-from utils.vizualizators import vizualizator_old
 
 
-class NEWJSON_COCO_GENERATOR(tf.keras.utils.Sequence):
+class DatasetGeneratorFromCocoJson(tf.keras.utils.Sequence):
     def __init__(self, batch_size=8, image_list=[], classes=[], input_image_size=(128, 128),
                  shuffle=False, coco: COCO = None,
                  path_folder=None,
-                 mask_type='categorical'):
+                 mask_type='categorical',
+                 aurgment=True):
 
         super().__init__()
+        self.aurgment = aurgment
         self.batch_size = batch_size
         self.image_list = image_list
         self.classes = classes
@@ -41,21 +36,20 @@ class NEWJSON_COCO_GENERATOR(tf.keras.utils.Sequence):
         random.shuffle(self.image_list)
 
     def __len__(self):
-        # return 10000
-        return int(len(self.image_list)//self.batch_size) * 20
+        return int(len(self.image_list) // self.batch_size) * 60
 
     def getImagePathByCocoId(self, image_id):
         image = self.coco.loadImgs([image_id])[0]
         imagePath = DATASET_PATH + '/' + image['file_name']
         return imagePath
 
-    def getImage(self, imageObj,  dir_images):
+    def getImage(self, imageObj, dir_images):
         imagepath = os.path.join(dir_images, imageObj['file_name'])
         # print(imagepath)
         if not os.path.exists(imagepath):
             print(f'Не могу найти путь: {imagepath}')
         train_img = cv2.imread(imagepath, cv2.IMREAD_COLOR)
-        train_img = (np.array(cv2.resize(train_img, self.input_image_size))/255).astype(np.float32)
+        train_img = (np.array(cv2.resize(train_img, self.input_image_size)) / 255).astype(np.float32)
         if len(train_img.shape) == 3 and train_img.shape[2] == 3:
             return train_img
         else:
@@ -68,7 +62,6 @@ class NEWJSON_COCO_GENERATOR(tf.keras.utils.Sequence):
                 return cats[i]['name']
         return None
 
-
     def getNormalMask(self, image_id):
         annIds = self.coco.getAnnIds(image_id, catIds=self.catIds, iscrowd=None)
         anns = self.coco.loadAnns(annIds)
@@ -80,7 +73,6 @@ class NEWJSON_COCO_GENERATOR(tf.keras.utils.Sequence):
             new_mask = cv2.resize(self.coco.annToMask(
                 anns[a]) * pixel_value, self.input_image_size)
             train_mask = np.maximum(new_mask, train_mask)
-        # print('Unique pixel values in the mask are:', np.unique(train_mask))
         train_mask = train_mask[:, :, np.newaxis]
         return train_mask.astype(np.float32)
 
@@ -92,6 +84,7 @@ class NEWJSON_COCO_GENERATOR(tf.keras.utils.Sequence):
         image = (image * 255).astype(np.uint8)
         gn_img = cv2.add(image, uni_merge)
         return np.array(gn_img / 255).astype(np.float64)
+
     def add_noise_blur(self, image, mask):
         random_koef = random.uniform(0, 0.3)
         image = self.gasuss_noise(image, random_koef)
@@ -149,10 +142,11 @@ class NEWJSON_COCO_GENERATOR(tf.keras.utils.Sequence):
 
     def __iter__(self):
         return self.__getitem__(self.c)
+
     def __getitem__(self, index):
         img = np.zeros((self.batch_size, self.input_image_size[0], self.input_image_size[1], 3)).astype('float32')
         mask = np.zeros((self.batch_size, self.input_image_size[0], self.input_image_size[1], 1)).astype('float32')
-        indexes = self.indexes[index*self.batch_size: (index + 1) * self.batch_size]
+        indexes = self.indexes[index * self.batch_size: (index + 1) * self.batch_size]
         for i in range(len(indexes)):
 
             if not self.image_list:
@@ -165,22 +159,18 @@ class NEWJSON_COCO_GENERATOR(tf.keras.utils.Sequence):
             train_mask = np.zeros((self.input_image_size[0], self.input_image_size[1], 1))
             if self.mask_type == 'categorical':
                 train_mask = self.getNormalMask(img_info['id'])
-
+            # if self.aurgment:
             train_img, train_mask = self.add_rotate(train_img, train_mask)
             train_img, train_mask = self.add_noise_blur(train_img, train_mask)
             img[i], mask[i] = train_img, train_mask
-            # img[i], mask[i] = train_img, train_mask
 
         self.c += self.batch_size
 
         if self.c + self.batch_size >= len(self.image_list):
             self.c = 0
             random.shuffle(self.image_list)
+        if self.aurgment:
+            img, mask = self.edit_background(img, mask)
+        ohe_hot_mask = tf.keras.utils.to_categorical(mask, num_classes=4)
 
-        img, mask = self.edit_background(img, mask)
-        hhhhh = tf.keras.utils.to_categorical(mask, num_classes=4)
-
-        print('__getitem__')
-        return img, hhhhh
-
-
+        return img, ohe_hot_mask

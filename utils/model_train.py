@@ -3,11 +3,15 @@ import math
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
+from keras.backend import epsilon
 from keras.models import Sequential
 
 from controller_vgtu_train.subprocess_train_model_controller import update_model_history
 from model.model_history import ModelHistory
-from utils.model_callbacks import callback_bce_dice_loss
+from utils.model_callbacks import callback_function
+import keras.backend as K
+
+
 
 
 class PrintTrueAndPred(tf.keras.callbacks.Callback):
@@ -16,25 +20,20 @@ class PrintTrueAndPred(tf.keras.callbacks.Callback):
         self.generator = generator
 
     def on_epoch_end(self, epoch, logs=None):
-        dddddddddd = {
-            0: 'background',
-            1: '1',
-            2: '2',
-            3: '3'
-        }
         img, mask = self.generator[0]
-        img_bath = tf.expand_dims(img[0], axis=0)
-        y_pred = self.model.predict(img_bath, verbose=1)
-        # plt.imshow(y_pred)
-        # plt.show()
-        fig, axs = plt.subplots(ncols=len(y_pred[0, 0, 0, :])+1, figsize=(10, 10))
-        axs[0].imshow(img[0])
-        axs[0].set_title('original mask')
-        for i in range(len(y_pred[0, 0, 0, :])):
-            axs[i + 1].imshow(y_pred[0, :, :, i])
-            axs[i + 1].set_title(dddddddddd[i])
+        fig, ax = plt.subplots(ncols=3, nrows=4)
+        fig.suptitle(f'epoch: {epoch}', fontsize=20, fontweight='bold')
+        y_pred = self.model.predict(img, verbose=1)
+
+        for i in range(4):
+            y_pred3 = np.argmax(y_pred[i], axis=-1)
+            ax[i][0].imshow(img[i])
+            ax[i][0].title.set_text('original image')
+            ax[i][1].imshow(np.argmax(mask[i], axis=-1))
+            ax[i][1].title.set_text('original mask')
+            ax[i][2].imshow(y_pred3.astype('uint8'))
+            ax[i][2].title.set_text('predict')
         plt.show()
-        print()
 
 
 def train_model(model: Sequential,
@@ -52,10 +51,10 @@ def train_model(model: Sequential,
         model_history.total_epochs = n_epoch
         update_model_history(model_history)
 
-    callback = callback_bce_dice_loss(path=path_model,
-                                      monitor=monitor,
-                                      mode=mode,
-                                      model_history=model_history)
+    callback = callback_function(path=path_model,
+                                 monitor=monitor,
+                                 mode=mode,
+                                 model_history=model_history)
 
     tb_callback = callback.tb_callback()
     reduce_lr = callback.reduce_lr()
@@ -63,19 +62,7 @@ def train_model(model: Sequential,
     print_test = callback.print_test()
     early_stop_train = callback.early_stopping()
 
-    steps_per_epoch = math.ceil((dataset_size_train // batch_size) * 20)
-    # print(dataset_size_train)
-    # print(batch_size)
-
-    # steps_per_epoch = 10
-    # steps_per_epoch = 15
-    validation_steps = 2
-    # validation_steps = math.ceil(dataset_size_val // batch_size)
-    # print(f'')
-    # validation_steps = len(dataset_valid) // batch_size
-    print(f'steps_per_epoch: {steps_per_epoch}')
-    # print(f'validation_steps: {validation_steps}')
-    # print('+++++++++++++++++++++++++++++++++++')
+    steps_per_epoch = math.ceil((dataset_size_train // batch_size) * 60)
 
     history = model.fit(
         dataset_train,
@@ -83,12 +70,8 @@ def train_model(model: Sequential,
         validation_steps=10,
         steps_per_epoch=steps_per_epoch,
         epochs=n_epoch,
-        # batch_size=batch_size,
-        # validation_steps=validation_steps,
         callbacks=[tb_callback, reduce_lr, checkpoint, print_test, PrintTrueAndPred(dataset_train)],
         verbose=True,
         shuffle=False
-        # batch_size=batch_size
-        # validation_split=0.3
     )
     return history

@@ -7,7 +7,7 @@ from model.model_history import ModelHistory
 
 
 
-class callback_bce_dice_loss():
+class callback_function():
 
     def __init__(self,
                  path=None,
@@ -40,7 +40,7 @@ class callback_bce_dice_loss():
     def reduce_lr(self):
         _reduce_lr = ReduceLROnPlateau(monitor=self.monitor,
                                        factor=0.05,
-                                       patience=3,
+                                       patience=15,
                                        verbose=1,
                                        min_delta=1e-05,
                                        mode=self.mode,

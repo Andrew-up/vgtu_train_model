@@ -10,8 +10,6 @@ def filterDataset(ann_file_path, classes=None, mode='train', percent_valid=50, p
 
     # initialize COCO api for instance annotations
     annFile = ann_file_path
-    # print(annFile)
-
     coco = COCO(annFile)
     print("filterDataset")
     images = []
@@ -27,8 +25,6 @@ def filterDataset(ann_file_path, classes=None, mode='train', percent_valid=50, p
     else:
         imgIds = coco.getImgIds()
         images = coco.loadImgs(imgIds)
-
-
 
     # if classes is None:
     #     classes = list()
@@ -70,19 +66,8 @@ def filterDataset(ann_file_path, classes=None, mode='train', percent_valid=50, p
                 valid_files.append(image_one)
         group_class.append(valid_files)
 
-
-    # print(group_class)
-
-    # return 0
     images_train_tmp = []
     images_valid_tmp = []
-
-
-    # image = coco.loadImgs([266])[0]
-    # imagePath = DATASET_PATH +'/'+ image['file_name']
-    # print(imagePath)
-    # file_true = os.path.exists(imagePath)
-    # print(file_true)
 
     images_train_unique = []
     images_valid_unique = []
@@ -94,27 +79,6 @@ def filterDataset(ann_file_path, classes=None, mode='train', percent_valid=50, p
         else:
             images_train_tmp += classesss
 
-
-    #
-    # a = len(group_class[0])
-    # b = round(percent / 100 * len(group_class[0]))
-
-    # print(group_class[0][:b])
-
-
-    # fdfdfd = group_class[0][:b]
-    # for i in fdfdfd:
-    #     # imgone = i['id']
-    #     # print(i)
-    #     annIds = coco.getAnnIds(imgIds=i['id'])
-    #     anns = coco.loadAnns(annIds)
-    #     # print(anns)
-    #     cat_ids = coco.getCatIds(catIds=anns[0]['category_id'])
-    #     cats = coco.loadCats(cat_ids)
-    #     # print(cats[0]['name'])
-    #     # print(idddd)
-    # # print(coco.cats)
-
     for i in range(len(images_train_tmp)):
         if images_train_tmp[i] not in images_train_unique:
             images_train_unique.append(images_train_tmp[i])
@@ -123,18 +87,8 @@ def filterDataset(ann_file_path, classes=None, mode='train', percent_valid=50, p
         if images_valid_tmp[i] not in images_valid_unique:
             images_valid_unique.append(images_valid_tmp[i])
 
-    print('____________________________')
-    # print(f'РАЗМЕР ДАТАСЕТА ДЛЯ ОБУЧЕНИЯ - : {len(images_train_unique)}')
-    # print(f'РАЗМЕР ДАТАСЕТА ДЛЯ ВАЛИДАЦИИ - : {len(images_valid_unique)}')
 
 
-
-    #
-    # for i in range(len(images)):
-    #     if images[i] not in unique_images:
-    #         unique_images.append(images[i])
-
-    # print(len(images_train_unique))
     if shuffie:
         random.shuffle(images_train_unique)
         # print(len(images_train_unique))
@@ -148,15 +102,3 @@ def filterDataset(ann_file_path, classes=None, mode='train', percent_valid=50, p
             name = coco.cats[i]['name']
             classes.append(name)
         return images_train_unique, images_valid_unique, coco, classes
-
-
-# def getDataset(batch_size, subset, ):
-#     dataset = DataGeneratorFromCocoJson(batch_size=8,
-#                                         subset='train',
-#                                         image_list=images_train,
-#                                         classes=classes,
-#                                         input_image_size=input_image_size,
-#                                         ann_file=path_json_train,
-#                                         shuffle=False)
-#
-#     return dataset

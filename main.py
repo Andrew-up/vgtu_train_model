@@ -17,7 +17,7 @@ from utils.unet import get_model
 import tensorflow as tf
 from utils.DataGeneratorFromCocoJson import DataGeneratorFromCocoJson
 
-from utils.CocoGenerator_new import NEWJSON_COCO_GENERATOR
+from utils.CocoGenerator_new import DatasetGeneratorFromCocoJson
 
 from utils.vizualizators import vizualizator_old
 
@@ -43,17 +43,17 @@ def main():
     print(classes_train)
 
     batch_size = 4
-    train_gen = NEWJSON_COCO_GENERATOR(batch_size=batch_size, image_list=images_train, coco=coco_train,
-                                       path_folder=DATASET_PATH, classes=classes_train)
+    train_gen = DatasetGeneratorFromCocoJson(batch_size=batch_size, image_list=images_train, coco=coco_train,
+                                             path_folder=DATASET_PATH, classes=classes_train)
 
-    val_gen = NEWJSON_COCO_GENERATOR(batch_size=batch_size, image_list=images_train, coco=coco_train,
-                                     path_folder=DATASET_PATH, classes=classes_train)
+    val_gen = DatasetGeneratorFromCocoJson(batch_size=batch_size, image_list=images_train, coco=coco_train,
+                                           path_folder=DATASET_PATH, classes=classes_train, aurgment=False)
 
     img, mask = train_gen.__getitem__(0)
     visualizeImageOrGenerator(images_list=img, mask_list=mask)
     # return 0
     model = get_model(img_size=(128, 128, 3), num_classes=len(classes_train)+1)
-    tf.keras.utils.plot_model(model, to_file='model_plot.png', show_shapes=True, show_layer_names=True)
+    # tf.keras.utils.plot_model(model, to_file='model_plot.png', show_shapes=True, show_layer_names=True)
 
     path_model = os.path.join(MODEL_H5_PATH, MODEL_H5_FILE_NAME)
     model_history = get_last_model_history()
@@ -70,11 +70,11 @@ def main():
                           dataset_size_train=len(images_train),
                           # dataset_size_val=len(images_valid),
                           model_history=model_history,
-                          monitor='my_mean_iou',
+                          monitor='dice_coef',
                           mode='max'
                           )
 
-    plot_segm_history(history, metrics=['my_mean_iou', 'val_my_mean_iou'])
+    plot_segm_history(history, metrics=['dice_coef', 'val_dice_coef'])
 
     path_zip = zipfile.ZipFile(f'{os.path.splitext(path_model)[0]}.zip', 'w')
     path_zip.write(path_model, arcname=f'{model_history.name_file}')
@@ -84,8 +84,8 @@ def main():
 
     if model_history:
         model_history.date_train = datetime.now().strftime("%d-%B-%Y %H:%M:%S")
-        model_history.quality_dataset = len(images_train) + len(images_valid)
-        model_history.quality_valid_dataset = str(len(images_valid))
+        model_history.quality_dataset = len(images_train) + len(images_train)
+        model_history.quality_valid_dataset = str(len(images_train))
         model_history.quality_train_dataset = str(len(images_train))
         model_history.num_classes = str(len(classes_train))
         model_history.status = "completed"
