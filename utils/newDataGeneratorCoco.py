@@ -95,11 +95,16 @@ def visualizeImageOrGenerator(gen=None, subtitle=None, images_list=None, mask_li
     # Iterate the generator to get image and mask batches
     if gen is not None:
         img, mask = next(gen)
+
+        # mask = np.argmax(mask)
     else:
         img, mask = images_list, mask_list
+        mask = np.argmax(mask, axis=-1)
+        mask = mask[:, :, :, np.newaxis]
+        print(mask.shape)
     print()
-    print(f'-{subtitle}-LEN IMG: {len(img)} {img.shape}')
-    print(f'-{subtitle}-LEN MASK: {len(mask)} {mask.shape}')
+    print(f'-{subtitle}-LEN IMG:  {img.shape}')
+    print(f'-{subtitle}-LEN MASK:  {mask.shape}')
     print()
     fig = plt.figure(figsize=(20, 10))
     fig.suptitle(subtitle, fontsize=50, fontweight='bold')

@@ -24,16 +24,22 @@ def filterDataset(ann_file_path, classes=None, mode='train', percent_valid=50, p
             imgIds = coco.getImgIds(catIds=catIds)
             images += coco.loadImgs(imgIds)
 
-
-
     else:
         imgIds = coco.getImgIds()
         images = coco.loadImgs(imgIds)
 
 
-    classes = []
+
+    # if classes is None:
+    #     classes = list()
+    #     for i in coco.cats:
+    #         name = coco.cats[i]['name']
+    #         classes.append(name)
+    #         # print(name)
+
     classes2 = set()
     img_ids = coco.getImgIds()
+    classes = []
     for img_id in img_ids:
         ann_ids = coco.getAnnIds(imgIds=[img_id])
         anns = coco.loadAnns(ann_ids)
@@ -44,6 +50,7 @@ def filterDataset(ann_file_path, classes=None, mode='train', percent_valid=50, p
         class_name = coco.loadCats(class_id)[0]['name']
         classes.append(class_name)
         print(f'{class_id}: {class_name}')
+
 
     unique_images = []
 

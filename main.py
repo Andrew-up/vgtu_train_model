@@ -35,45 +35,25 @@ def main():
                                                                # path_folder='train'
                                                                )
 
-    images_valid, _, coco_valid, classes_valid = filterDataset(ANNOTATION_FILE_PATH,
-                                                               percent_valid=0,
-                                                               # path_folder='train'
-                                                               )
-
-    train_gen = NEWJSON_COCO_GENERATOR(batch_size=4, image_list=images_train, coco=coco_train, path_folder=DATASET_PATH, classes=classes_train)
-    train_val = NEWJSON_COCO_GENERATOR(batch_size=4, image_list=images_valid, coco=coco_valid, path_folder=DATASET_PATH, classes=classes_valid)
-
-
-    train_gen[0]
-    return 0
-    # for i in range(10):
-    #     visualizeImageOrGenerator(gen=train_gen)
-        # print(i)
-    # return 0
-
-    # return 0
-
-    # images_valid, _, coco_valid, classes_valid = filterDataset(ANNOTATION_FILE_PATH_VALID,
+    # images_valid, _, coco_valid, classes_valid = filterDataset(ANNOTATION_FILE_PATH,
     #                                                            percent_valid=0,
-    #                                                            path_folder='valid'
+    #                                                            # path_folder='train'
     #                                                            )
 
-    # print('classes_train: ')
-    # print(classes_train)
-    # images_test, _, coco, classes = filterDataset(ANNOTATION_FILE_PATH_TEST, percent_valid=0)
+    print(classes_train)
 
-    print(f'РАЗМЕР ДАТАСЕТА ДЛЯ ОБУЧЕНИЯ - : {len(images_train)}')
-    # print(f'РАЗМЕР ДАТАСЕТА ДЛЯ ВАЛИДАЦИИ - : {len(images_valid)}')
-
-    input_image_size = (128, 128)
     batch_size = 4
+    train_gen = NEWJSON_COCO_GENERATOR(batch_size=batch_size, image_list=images_train, coco=coco_train,
+                                       path_folder=DATASET_PATH, classes=classes_train)
 
-    # visualizeImageOrGenerator(gen=train_gen)
-    # vizualizator_old(train_gen, classes_train)
+    val_gen = NEWJSON_COCO_GENERATOR(batch_size=batch_size, image_list=images_train, coco=coco_train,
+                                     path_folder=DATASET_PATH, classes=classes_train)
 
-    # Вроде норм обучается
-    model = get_model((input_image_size[0], input_image_size[1], 3), num_classes=len(classes_train))
-    # tf.keras.utils.plot_model(model, to_file='model_plot.png', show_shapes=True, show_layer_names=True)
+    img, mask = train_gen.__getitem__(0)
+    visualizeImageOrGenerator(images_list=img, mask_list=mask)
+    # return 0
+    model = get_model(img_size=(128, 128, 3), num_classes=len(classes_train)+1)
+    tf.keras.utils.plot_model(model, to_file='model_plot.png', show_shapes=True, show_layer_names=True)
 
     path_model = os.path.join(MODEL_H5_PATH, MODEL_H5_FILE_NAME)
     model_history = get_last_model_history()
@@ -86,9 +66,9 @@ def main():
                           n_epoch=500,
                           batch_size=batch_size,
                           dataset_train=train_gen,
-                          dataset_valid=train_val,
+                          dataset_valid=val_gen,
                           dataset_size_train=len(images_train),
-                          dataset_size_val=len(images_valid),
+                          # dataset_size_val=len(images_valid),
                           model_history=model_history,
                           monitor='my_mean_iou',
                           mode='max'
