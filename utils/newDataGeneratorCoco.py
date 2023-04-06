@@ -8,6 +8,7 @@ from matplotlib import gridspec
 from definitions import DATASET_PATH, ROOT_DIR, ANNOTATION_FILE_PATH_VALID_IMAGE
 import tensorflow as tf
 
+
 def getNormalMask(coco, image_id, catIds, input_image_size, classes):
     annIds = coco.getAnnIds(image_id, catIds=catIds, iscrowd=None)
     anns = coco.loadAnns(annIds)
@@ -88,6 +89,26 @@ def cocoDataGenerator(images, classes, coco, folder=None,
         mask = np.array(mask).astype(np.float32)
         yield img, mask
 
+colors = [
+    [0, 0, 0],   # Красный
+    [0, 255, 0],   # Зеленый
+    [0, 0, 255],   # Синий
+    [255, 255, 0]  # Желтый
+]
+def color_mask(mask):
+    # Создаем пустой массив для раскрашенной маски
+    colored_mask = np.zeros((mask.shape[0], mask.shape[1], 3), dtype=np.uint8)
+    # Создаем словарь с цветами для каждого класса
+    for i in range(mask.shape[0]):
+        for j in range(mask.shape[1]):
+            # Получаем класс текущего пикселя
+            cls = mask[i, j, 0]
+            # Получаем цвет для данного класса из словаря
+            color = colors[cls]
+            # Раскрашиваем пиксель в соответствующий цвет
+            colored_mask[i, j, :] = color
+    return colored_mask
+
 
 def visualizeImageOrGenerator(gen=None, subtitle=None, images_list=None, mask_list=None):
     colors = ['#0044ff', '#ff00fb', '#ff0000', '#2bff00', '#474B4E', '#D84B20', '#8F8F8F', '#6D6552', '#4E5754',
@@ -118,7 +139,7 @@ def visualizeImageOrGenerator(gen=None, subtitle=None, images_list=None, mask_li
                 ax.imshow(img[j])
             else:
                 mask_one = mask[j, :, :]
-                ax.imshow(mask_one, alpha=1)
+                ax.imshow(color_mask(mask_one), alpha=1)
             ax.axis('off')
             fig.add_subplot(ax)
     plt.show()

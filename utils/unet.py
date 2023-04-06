@@ -11,19 +11,23 @@ class MyMeanIOU(tf.keras.metrics.MeanIoU):
         return super().update_state(tf.argmax(y_true, axis=-1), tf.argmax(y_pred, axis=-1), sample_weight)
 
 
+class CustomCategoricalCrossentropy(tf.keras.losses.Loss):
+    def __init__(self, name='custom_categorical_crossentropy'):
+        super().__init__(name=name)
+
+    def call(self, y_true, y_pred):
+        # Создаем маску, которая будет устанавливать веса для каждого класса
+        mask = tf.cast(tf.math.not_equal(tf.argmax(y_true, axis=-1), 0), tf.float32)
+        # Вычисляем потери с учетом маски
+        loss = tf.keras.losses.categorical_crossentropy(y_true, y_pred) * mask
+        # Усредняем потери по батчу
+        return tf.reduce_mean(loss, axis=-1)
+
 def dice_coef(y_true, y_pred, smooth=1):
     y_true_f = K.flatten(y_true[..., 1:])  # удаляем первый канал, отвечающий за фон
     y_pred_f = K.flatten(y_pred[..., 1:])
     intersection = K.sum(y_true_f * y_pred_f)
     return (2. * intersection + smooth) / (K.sum(y_true_f) + K.sum(y_pred_f) + smooth)
-
-
-def dice_loss(y_true, y_pred):
-    y_true_f = K.flatten(y_true[..., 1:])  # удаляем первый канал, отвечающий за фон
-    y_pred_f = K.flatten(y_pred[..., 1:])
-    intersection = K.sum(y_true_f * y_pred_f)
-    return 1 - (2. * intersection + 1.) / (K.sum(y_true_f) + K.sum(y_pred_f) + 1.)
-
 
 def get_model(img_size, num_classes):
     inputs = Input(img_size)
@@ -76,7 +80,7 @@ def get_model(img_size, num_classes):
     outputs = layers.Conv2D(num_classes, 3, activation="softmax", padding="same")(x)
 
     model = keras.Model(inputs, outputs)
-
     iou = MyMeanIOU(num_classes=num_classes)
-    model.compile(optimizer="adam", loss=dice_loss, metrics=[iou, dice_coef, 'accuracy'])
+
+    model.compile(optimizer="adam", loss=tf.keras.losses.CategoricalCrossentropy(), metrics=[iou, dice_coef, 'accuracy'])
     return model

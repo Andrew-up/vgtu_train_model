@@ -19,7 +19,6 @@ from utils.DataGeneratorFromCocoJson import DataGeneratorFromCocoJson
 
 from utils.CocoGenerator_new import DatasetGeneratorFromCocoJson
 
-from utils.vizualizators import vizualizator_old
 
 
 def main():
@@ -47,13 +46,17 @@ def main():
                                              path_folder=DATASET_PATH, classes=classes_train)
 
     val_gen = DatasetGeneratorFromCocoJson(batch_size=batch_size, image_list=images_train, coco=coco_train,
-                                           path_folder=DATASET_PATH, classes=classes_train, aurgment=False)
+                                           path_folder=DATASET_PATH, classes=classes_train, aurgment=True)
 
     img, mask = train_gen.__getitem__(0)
     visualizeImageOrGenerator(images_list=img, mask_list=mask)
+
+
     # return 0
     model = get_model(img_size=(128, 128, 3), num_classes=len(classes_train)+1)
-    # tf.keras.utils.plot_model(model, to_file='model_plot.png', show_shapes=True, show_layer_names=True)
+
+
+    tf.keras.utils.plot_model(model, to_file='model_plot.png', show_shapes=True, show_layer_names=True)
 
     path_model = os.path.join(MODEL_H5_PATH, MODEL_H5_FILE_NAME)
     model_history = get_last_model_history()
@@ -63,18 +66,18 @@ def main():
 
     history = train_model(path_model=path_model,
                           model=model,
-                          n_epoch=500,
+                          n_epoch=100,
                           batch_size=batch_size,
                           dataset_train=train_gen,
                           dataset_valid=val_gen,
                           dataset_size_train=len(images_train),
                           # dataset_size_val=len(images_valid),
                           model_history=model_history,
-                          monitor='dice_coef',
+                          monitor='my_mean_iou',
                           mode='max'
                           )
 
-    plot_segm_history(history, metrics=['dice_coef', 'val_dice_coef'])
+    plot_segm_history(history, metrics=['my_mean_iou', 'val_my_mean_iou'])
 
     path_zip = zipfile.ZipFile(f'{os.path.splitext(path_model)[0]}.zip', 'w')
     path_zip.write(path_model, arcname=f'{model_history.name_file}')

@@ -36,7 +36,7 @@ class DatasetGeneratorFromCocoJson(tf.keras.utils.Sequence):
         random.shuffle(self.image_list)
 
     def __len__(self):
-        return int(len(self.image_list) // self.batch_size) * 60
+        return int(len(self.image_list) // self.batch_size) * 80
 
     def getImagePathByCocoId(self, image_id):
         image = self.coco.loadImgs([image_id])[0]
@@ -160,8 +160,8 @@ class DatasetGeneratorFromCocoJson(tf.keras.utils.Sequence):
             if self.mask_type == 'categorical':
                 train_mask = self.getNormalMask(img_info['id'])
             # if self.aurgment:
-            train_img, train_mask = self.add_rotate(train_img, train_mask)
-            train_img, train_mask = self.add_noise_blur(train_img, train_mask)
+            # train_img, train_mask = self.add_rotate(train_img, train_mask)
+            # train_img, train_mask = self.add_noise_blur(train_img, train_mask)
             img[i], mask[i] = train_img, train_mask
 
         self.c += self.batch_size
@@ -171,6 +171,6 @@ class DatasetGeneratorFromCocoJson(tf.keras.utils.Sequence):
             random.shuffle(self.image_list)
         if self.aurgment:
             img, mask = self.edit_background(img, mask)
-        ohe_hot_mask = tf.keras.utils.to_categorical(mask, num_classes=4)
 
+        ohe_hot_mask = tf.keras.utils.to_categorical(mask, num_classes=len(self.classes)+1)
         return img, ohe_hot_mask
