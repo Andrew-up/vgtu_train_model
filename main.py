@@ -3,22 +3,17 @@ import time
 import zipfile
 from datetime import datetime
 
-from keras_preprocessing.image import ImageDataGenerator
+import tensorflow as tf
 
 from controller_vgtu_train.subprocess_train_model_controller import get_last_model_history, update_model_history
-from definitions import MODEL_H5_PATH, ANNOTATION_FILE_PATH, MODEL_H5_FILE_NAME, DATASET_PATH
-from utils.build_model import unet_model
+from definitions import MODEL_H5_PATH, MODEL_H5_FILE_NAME, DATASET_PATH
+from utils.CocoGenerator_new import DatasetGeneratorFromCocoJson
 from utils.get_dataset_coco import filterDataset
 from utils.helpers import delete_legacy_models_and_zip
 from utils.model_losses import plot_segm_history
 from utils.model_train import train_model
-from utils.newDataGeneratorCoco import cocoDataGenerator, augmentationsGenerator, visualizeImageOrGenerator
-from utils.unet import get_model
-import tensorflow as tf
-from utils.DataGeneratorFromCocoJson import DataGeneratorFromCocoJson
-
-from utils.CocoGenerator_new import DatasetGeneratorFromCocoJson
-
+from utils.unet import unet
+from utils.vizualizators import gen_viz
 
 
 def main():
@@ -29,35 +24,45 @@ def main():
         print(f'Удалено старых моделей h5 и zip архивов: {check_garbage_files_count}')
     timer = time.time()
 
-    images_train, _, coco_train, classes_train = filterDataset(ANNOTATION_FILE_PATH,
+    images_train, _, coco_train, classes_train = filterDataset(ann_file_name='_annotations.coco.json',
                                                                percent_valid=0,
-                                                               # path_folder='train'
+                                                               path_folder='train'
                                                                )
 
-    # images_valid, _, coco_valid, classes_valid = filterDataset(ANNOTATION_FILE_PATH,
-    #                                                            percent_valid=0,
-    #                                                            # path_folder='train'
-    #                                                            )
+    # return 0
+    images_valid, _, coco_valid, classes_valid = filterDataset(ann_file_name='_annotations.coco.json',
+                                                               percent_valid=0,
+                                                               path_folder='valid'
+                                                               )
+
+    print(f'РАЗМЕР ДАТАСЕТА ДЛЯ ТРЕНИРОВКИ: {len(images_train)}')
+    print(f'РАЗМЕР ДАТАСЕТА ДЛЯ ВАЛИДАЦИИ: {len(images_valid)}')
 
     print(classes_train)
 
     batch_size = 4
     train_gen = DatasetGeneratorFromCocoJson(batch_size=batch_size, image_list=images_train, coco=coco_train,
-                                             path_folder=DATASET_PATH, classes=classes_train)
+                                             path_folder=os.path.join(DATASET_PATH, 'train'), classes=classes_train,
+                                             aurgment=False)
 
-    val_gen = DatasetGeneratorFromCocoJson(batch_size=batch_size, image_list=images_train, coco=coco_train,
-                                           path_folder=DATASET_PATH, classes=classes_train, aurgment=True)
+    val_gen = DatasetGeneratorFromCocoJson(batch_size=batch_size, image_list=images_valid, coco=coco_valid,
+                                           path_folder=os.path.join(DATASET_PATH, 'valid'), classes=classes_train,
+                                           aurgment=False)
 
     img, mask = train_gen.__getitem__(0)
-    visualizeImageOrGenerator(images_list=img, mask_list=mask)
-
+    gen_viz(img_s=img, mask_s=mask)
+    # return 0
+    # visualizeImageOrGenerator(images_list=img, mask_list=mask)
+    #
+    # img1, mask1 = val_gen.__getitem__(0)
+    # visualizeImageOrGenerator(images_list=img1, mask_list=mask1)
 
     # return 0
-    model = get_model(img_size=(128, 128, 3), num_classes=len(classes_train)+1)
-
+    model = unet(input_shape=(128, 128, 3), num_classes=len(classes_train))
 
     tf.keras.utils.plot_model(model, to_file='model_plot.png', show_shapes=True, show_layer_names=True)
 
+    # return 0
     path_model = os.path.join(MODEL_H5_PATH, MODEL_H5_FILE_NAME)
     model_history = get_last_model_history()
     if model_history:
@@ -66,15 +71,15 @@ def main():
 
     history = train_model(path_model=path_model,
                           model=model,
-                          n_epoch=100,
+                          n_epoch=1000,
                           batch_size=batch_size,
                           dataset_train=train_gen,
                           dataset_valid=val_gen,
                           dataset_size_train=len(images_train),
                           # dataset_size_val=len(images_valid),
                           model_history=model_history,
-                          monitor='my_mean_iou',
-                          mode='max'
+                          monitor='loss',
+                          mode='min'
                           )
 
     plot_segm_history(history, metrics=['my_mean_iou', 'val_my_mean_iou'])

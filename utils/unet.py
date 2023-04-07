@@ -1,9 +1,13 @@
 import keras
 import tensorflow as tf
-from keras import layers, Input
+from keras import layers, Input, Model
 
 import keras.backend as K
 from keras.backend import epsilon
+from keras.layers import Conv2D, BatchNormalization, Activation, Conv2DTranspose, MaxPooling2D, concatenate, Dropout, \
+    Lambda
+from keras.losses import binary_crossentropy
+from keras.optimizers import Adam
 
 
 class MyMeanIOU(tf.keras.metrics.MeanIoU):
@@ -11,28 +15,37 @@ class MyMeanIOU(tf.keras.metrics.MeanIoU):
         return super().update_state(tf.argmax(y_true, axis=-1), tf.argmax(y_pred, axis=-1), sample_weight)
 
 
-class CustomCategoricalCrossentropy(tf.keras.losses.Loss):
-    def __init__(self, name='custom_categorical_crossentropy'):
-        super().__init__(name=name)
+# def dice_coef(y_true, y_pred, smooth=1):
+#     intersection = K.sum(y_true * y_pred, axis=[1, 2, 3])
+#     union = K.sum(y_true, axis=[1, 2, 3]) + K.sum(y_pred, axis=[1, 2, 3])
+#     dice = K.mean((2. * intersection + smooth) / (union + smooth), axis=0)
+#     return dice
 
-    def call(self, y_true, y_pred):
-        # Создаем маску, которая будет устанавливать веса для каждого класса
-        mask = tf.cast(tf.math.not_equal(tf.argmax(y_true, axis=-1), 0), tf.float32)
-        # Вычисляем потери с учетом маски
-        loss = tf.keras.losses.categorical_crossentropy(y_true, y_pred) * mask
-        # Усредняем потери по батчу
-        return tf.reduce_mean(loss, axis=-1)
+def dice_loss(y_true, y_pred):
+    smooth = 1.
+    y_true_f = K.flatten(y_true)
+    y_pred_f = K.flatten(y_pred)
+    intersection = y_true_f * y_pred_f
+    score = (2. * K.sum(intersection) + smooth) / (K.sum(y_true_f) + K.sum(y_pred_f) + smooth)
+    return 1. - score
+
 
 def dice_coef(y_true, y_pred, smooth=1):
-    y_true_f = K.flatten(y_true[..., 1:])  # удаляем первый канал, отвечающий за фон
-    y_pred_f = K.flatten(y_pred[..., 1:])
+    y_true_f = K.flatten(y_true)
+    y_pred_f = K.flatten(y_pred)
     intersection = K.sum(y_true_f * y_pred_f)
     return (2. * intersection + smooth) / (K.sum(y_true_f) + K.sum(y_pred_f) + smooth)
 
-def get_model(img_size, num_classes):
-    inputs = Input(img_size)
+
+def bce_dice_loss(y_true, y_pred):
+    return binary_crossentropy(tf.cast(y_true, tf.float32), y_pred) + 0.5 * dice_loss(tf.cast(y_true, tf.float32), y_pred)
+
+def unet(num_classes=None, input_shape=(128, 128, 3)):
+
+    img_input = Input(input_shape)
+    # s = Lambda(lambda x: x / 255)(img_input)
     # Entry block
-    x = layers.Conv2D(32, 3, strides=2, padding="same")(inputs)
+    x = layers.Conv2D(32, 3, strides=2, padding="same")(img_input)
     x = layers.BatchNormalization()(x)
     x = layers.Activation("relu")(x)
 
@@ -79,8 +92,7 @@ def get_model(img_size, num_classes):
     # Add a per-pixel classification layer
     outputs = layers.Conv2D(num_classes, 3, activation="softmax", padding="same")(x)
 
-    model = keras.Model(inputs, outputs)
-    iou = MyMeanIOU(num_classes=num_classes)
-
-    model.compile(optimizer="adam", loss=tf.keras.losses.CategoricalCrossentropy(), metrics=[iou, dice_coef, 'accuracy'])
+    model = Model(img_input, outputs)
+    # iou = MyMeanIOU(num_classes=num_classes, ignore_class=0)
+    model.compile(optimizer=Adam(learning_rate=0.001), loss=dice_loss)
     return model

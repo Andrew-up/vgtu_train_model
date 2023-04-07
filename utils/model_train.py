@@ -12,25 +12,8 @@ from model.model_history import ModelHistory
 from utils.model_callbacks import callback_function
 import keras.backend as K
 
-colors = [
-    [0, 0, 0],   # Красный
-    [0, 255, 0],   # Зеленый
-    [0, 0, 255],   # Синий
-    [255, 255, 0]  # Желтый
-]
-def color_mask(mask):
-    mask = np.argmax(mask, axis=-1)
-    mask = mask[:, :, np.newaxis]
-    colored_mask = np.zeros((mask.shape[0], mask.shape[1], 3), dtype=np.uint8)
-    for i in range(mask.shape[0]):
-        for j in range(mask.shape[1]):
-            # Получаем класс текущего пикселя
-            cls = mask[i, j, 0]
-            # Получаем цвет для данного класса из словаря
-            color = colors[cls]
-            # Раскрашиваем пиксель в соответствующий цвет
-            colored_mask[i, j, :] = color
-    return colored_mask
+from utils.vizualizators import gen_viz
+
 
 class PrintTrueAndPred(tf.keras.callbacks.Callback):
     def __init__(self, generator):
@@ -38,25 +21,11 @@ class PrintTrueAndPred(tf.keras.callbacks.Callback):
         self.generator = generator
 
     def on_epoch_end(self, epoch, logs=None):
-        img, mask = self.generator[0]
-        fig, ax = plt.subplots(ncols=3, nrows=4)
-        fig.suptitle(f'epoch: {epoch}', fontsize=20, fontweight='bold')
+        img, mask = self.generator.__getitem__(0)
+        # fig, ax = plt.subplots(ncols=3, nrows=4)
+        # fig.suptitle(f'epoch: {epoch}', fontsize=20, fontweight='bold')
         y_pred = self.model.predict(img, verbose=1)
-        ax[0][0].title.set_text('original image')
-        ax[0][1].title.set_text('original mask')
-        ax[0][2].title.set_text('predict mask image')
-        for i in range(4):
-            # y_pred3 = np.argmax(y_pred[i], axis=-1)
-            ax[i][0].imshow(img[i])
-            ax[i][1].imshow(color_mask(mask[i]))
-            mask123123 = np.argmax(y_pred[i], axis=-1)
-            mask1231 = tf.keras.utils.to_categorical(mask123123)
-            ax[i][2].imshow(color_mask(mask1231))
-            ax[i][0].axis('off')
-            ax[i][1].axis('off')
-            ax[i][2].axis('off')
-
-        plt.show()
+        gen_viz(img_s=img, mask_s=mask, pred=y_pred)
 
 
 def train_model(model: Sequential,
@@ -84,13 +53,12 @@ def train_model(model: Sequential,
     checkpoint = callback.checkpoint()
     print_test = callback.print_test()
     early_stop_train = callback.early_stopping()
-
-    steps_per_epoch = math.ceil((dataset_size_train // batch_size) * 50)
+    steps_per_epoch = int(dataset_size_train // batch_size)
 
     history = model.fit(
         dataset_train,
         validation_data=dataset_valid,
-        validation_steps=10,
+        validation_steps=3,
         steps_per_epoch=steps_per_epoch,
         epochs=n_epoch,
         callbacks=[tb_callback, reduce_lr, checkpoint, print_test, PrintTrueAndPred(dataset_train)],

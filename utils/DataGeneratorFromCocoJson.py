@@ -73,10 +73,10 @@ class DataGeneratorFromCocoJson(tf.keras.utils.Sequence):
     def getLevelsMask(self, image_id):
         # for each category , we get the x mask and add it to mask list
         res = []
-        mask = np.zeros((self.input_image_size))
+        # mask = np.zeros((self.input_image_size))
         for j, categorie in enumerate(self.catIds):
-            annIds = self.coco.getAnnIds(image_id, catIds=categorie, iscrowd=None)
-            anns = self.coco.loadAnns(annIds)
+            # annIds = self.coco.getAnnIds(image_id, catIds=categorie, iscrowd=None)
+            # anns = self.coco.loadAnns(annIds)
             # print(image_id)
             # print('SSSSSSSSSSSS')
             mask = self.getNormalMask(image_id, categorie)

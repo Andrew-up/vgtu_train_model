@@ -1,15 +1,16 @@
 import os
 import random
 from pycocotools.coco import COCO
-from definitions import ANNOTATION_FILE_PATH_VALID_IMAGE
 
 from definitions import DATASET_PATH
 
 
-def filterDataset(ann_file_path, classes=None, mode='train', percent_valid=50, path_folder=None, shuffie=True):
+def filterDataset(ann_file_name, classes=None, mode='train', percent_valid=50, path_folder=None, shuffie=True):
 
     # initialize COCO api for instance annotations
-    annFile = ann_file_path
+    annFile = DATASET_PATH + path_folder + '/' + ann_file_name
+    annFile = os.path.normpath(annFile)
+
     coco = COCO(annFile)
     print("filterDataset")
     images = []
@@ -51,23 +52,35 @@ def filterDataset(ann_file_path, classes=None, mode='train', percent_valid=50, p
     unique_images = []
 
     group_class = []
+    # countimage = 0
+
+    # sums = 0
     for i in classes:
         l = []
         catIds = coco.getCatIds(catNms=i)
+
         imgssss = coco.getImgIds(catIds=catIds)
+        # print(imgssss)
+        # sums += len(imgssss)
         l += coco.loadImgs(imgssss)
         valid_files = []
         for image_one in l:
-            imagePath = DATASET_PATH + '/' + image_one['file_name']
-            if path_folder is not None:
-                # imagePath = os.path.join(DATASET_PATH, path_folder)
-                imagePath = os.path.join(ANNOTATION_FILE_PATH_VALID_IMAGE, image_one['file_name'])
+            imagePath = DATASET_PATH + path_folder + '/' + image_one['file_name']
+            imagePath = os.path.normpath(imagePath)
+            # print(imagePath)
             if os.path.exists(imagePath):
                 valid_files.append(image_one)
-        group_class.append(valid_files)
+                # print(imagePath)
+                # countimage += 1
+            else:
+                print(f'no image : {imagePath}')
 
+        group_class.append(valid_files)
+    # print(f'countimage : {countimage}')
+    # print(f'sums : {sums}')
     images_train_tmp = []
     images_valid_tmp = []
+
 
     images_train_unique = []
     images_valid_unique = []
@@ -94,6 +107,7 @@ def filterDataset(ann_file_path, classes=None, mode='train', percent_valid=50, p
         # print(len(images_train_unique))
         random.shuffle(images_valid_unique)
 
+    # print(len(images_train_unique))
     if classes is not None:
         return images_train_unique, images_valid_unique, coco, classes
     else:

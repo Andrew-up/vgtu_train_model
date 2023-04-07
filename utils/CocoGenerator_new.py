@@ -2,11 +2,34 @@ import os.path
 import random
 
 import cv2
+import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
 from pycocotools.coco import COCO
 
 from definitions import DATASET_PATH, ROOT_DIR
+
+colors = [
+    [0, 0, 0],  # Красный
+    [0, 255, 0],  # Зеленый
+    [0, 0, 255],  # Синий
+    [255, 255, 0]  # Желтый
+]
+
+
+def color_mask(mask):
+    mask = np.argmax(mask, axis=-1)
+    mask = mask[:, :, np.newaxis]
+    colored_mask = np.zeros((mask.shape[0], mask.shape[1], 3), dtype=np.uint8)
+    for i in range(mask.shape[0]):
+        for j in range(mask.shape[1]):
+            # Получаем класс текущего пикселя
+            cls = mask[i, j, 0]
+            # Получаем цвет для данного класса из словаря
+            color = colors[cls]
+            # Раскрашиваем пиксель в соответствующий цвет
+            colored_mask[i, j, :] = color
+    return colored_mask
 
 
 class DatasetGeneratorFromCocoJson(tf.keras.utils.Sequence):
@@ -31,12 +54,28 @@ class DatasetGeneratorFromCocoJson(tf.keras.utils.Sequence):
         self.img_folder = path_folder
         self.mask_type = mask_type
 
+
+    def getLevelsMask(self, image_id):
+        # for each category , we get the x mask and add it to mask list
+        res = []
+        # mask = np.zeros((self.input_image_size))
+        for j, categorie in enumerate(self.catIds):
+            # annIds = self.coco.getAnnIds(image_id, catIds=categorie, iscrowd=None)
+            # anns = self.coco.loadAnns(annIds)
+            # print(image_id)
+            # print('SSSSSSSSSSSS')
+            mask = self.getNormalMask(image_id, categorie)
+            # print(type(mask))
+            res.append(mask)
+        return res
+
     def on_epoch_end(self):
         self.c = 0
-        random.shuffle(self.image_list)
+        np.random.shuffle(self.image_list)
 
     def __len__(self):
-        return int(len(self.image_list) // self.batch_size) * 80
+        # return 999999999999
+        return int(len(self.image_list) // self.batch_size)
 
     def getImagePathByCocoId(self, image_id):
         image = self.coco.loadImgs([image_id])[0]
@@ -62,18 +101,32 @@ class DatasetGeneratorFromCocoJson(tf.keras.utils.Sequence):
                 return cats[i]['name']
         return None
 
-    def getNormalMask(self, image_id):
-        annIds = self.coco.getAnnIds(image_id, catIds=self.catIds, iscrowd=None)
+    def checkMaskPixelIsClassId(self, mask, classId):
+        newmask = mask.copy()
+        for i in range(mask.shape[0]):
+            for j in range(mask.shape[1]):
+                # Получаем класс текущего пикселя
+                cls = mask[i, j]
+                if cls != classId and cls != 0:
+                    # print(classId)
+                    newmask[i, j] = classId
+
+        return newmask
+
+    def getNormalMask(self, image_id, catIds):
+        annIds = self.coco.getAnnIds(image_id, catIds=catIds, iscrowd=None)
         anns = self.coco.loadAnns(annIds)
-        cats = self.coco.loadCats(self.catIds)
-        train_mask = np.zeros((self.input_image_size[0], self.input_image_size[1]))
+        cats = self.coco.loadCats(catIds)
+        train_mask = np.zeros((self.input_image_size[0], self.input_image_size[1]), dtype=np.float32)
         for a in range(len(anns)):
+            # train_mask1111 = np.zeros((512, 512))
             className = self.getClassName(anns[a]['category_id'], cats)
             pixel_value = self.classes.index(className) + 1
             new_mask = cv2.resize(self.coco.annToMask(
-                anns[a]) * pixel_value, self.input_image_size)
+                anns[a]) * pixel_value, self.input_image_size, interpolation=cv2.INTER_AREA)
+            # new_mask = self.checkMaskPixelIsClassId(mask=new_mask, classId=pixel_value)
             train_mask = np.maximum(new_mask, train_mask)
-        train_mask = train_mask[:, :, np.newaxis]
+        # train_mask = train_mask[:, :, np.newaxis]
         return train_mask.astype(np.float32)
 
     def gasuss_noise(self, image, koef):
@@ -86,12 +139,13 @@ class DatasetGeneratorFromCocoJson(tf.keras.utils.Sequence):
         return np.array(gn_img / 255).astype(np.float64)
 
     def add_noise_blur(self, image, mask):
-        random_koef = random.uniform(0, 0.3)
+        random_koef = random.uniform(0, 0.2)
         image = self.gasuss_noise(image, random_koef)
         return np.array(image), np.array(mask)
 
     def add_rotate(self, image, mask, angle=45, scale=1.0):
-        angle = random.randrange(0, 359)
+        angle_list = [0, 90, 180, 270]
+        angle = random.choice(angle_list)
         (h, w) = image.shape[:2]
         center = (w / 2, h / 2)
         M = cv2.getRotationMatrix2D(center, angle, scale)
@@ -144,33 +198,44 @@ class DatasetGeneratorFromCocoJson(tf.keras.utils.Sequence):
         return self.__getitem__(self.c)
 
     def __getitem__(self, index):
-        img = np.zeros((self.batch_size, self.input_image_size[0], self.input_image_size[1], 3)).astype('float32')
-        mask = np.zeros((self.batch_size, self.input_image_size[0], self.input_image_size[1], 1)).astype('float32')
+        X = np.zeros((self.batch_size, self.input_image_size[0], self.input_image_size[1], 3)).astype('float32')
+        y = np.zeros((self.batch_size, self.input_image_size[0], self.input_image_size[1], len(self.classes))).astype('float32')
         indexes = self.indexes[index * self.batch_size: (index + 1) * self.batch_size]
         for i in range(len(indexes)):
 
             if not self.image_list:
                 print('СПИСОК ИЗОБРАЖЕНИЙ ПУСТ')
                 break
-            value = indexes[i]
 
+            value = indexes[i]
             img_info = self.image_list[value]
+            # print(img_info)
             train_img = self.getImage(imageObj=img_info, dir_images=self.img_folder)
-            train_mask = np.zeros((self.input_image_size[0], self.input_image_size[1], 1))
             if self.mask_type == 'categorical':
-                train_mask = self.getNormalMask(img_info['id'])
+                pass
+
+                # train_mask = self.getNormalMask(img_info['id'])
+            train_mask = self.getLevelsMask(img_info['id'])
+            train_mask = np.array(train_mask).astype(np.float32)
             # if self.aurgment:
-            # train_img, train_mask = self.add_rotate(train_img, train_mask)
-            # train_img, train_mask = self.add_noise_blur(train_img, train_mask)
-            img[i], mask[i] = train_img, train_mask
+            #     train_img, train_mask = self.add_rotate(train_img, train_mask)
+                # train_img, train_mask = self.add_noise_blur(train_img, train_mask)
+            X[i, ] = train_img
+            for j in range(len(self.catIds)):
+                y[i, :, :, j] = train_mask[j]
+                # mask[i, :, :, j] = train_mask[j]
+                # mask[i, :, :, j] = train_mask[j]
 
         self.c += self.batch_size
 
         if self.c + self.batch_size >= len(self.image_list):
             self.c = 0
             random.shuffle(self.image_list)
-        if self.aurgment:
-            img, mask = self.edit_background(img, mask)
+        # if self.aurgment:
+        #     img, mask = self.edit_background(img, mask)
 
-        ohe_hot_mask = tf.keras.utils.to_categorical(mask, num_classes=len(self.classes)+1)
-        return img, ohe_hot_mask
+        # ohe_hot_mask = tf.keras.utils.to_categorical(mask, num_classes=len(self.classes)+1)
+        img = np.array(X)
+        mask = np.array(y)
+        # print('get_item')
+        return img, mask

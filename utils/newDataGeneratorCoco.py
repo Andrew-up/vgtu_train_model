@@ -5,7 +5,7 @@ import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import gridspec
-from definitions import DATASET_PATH, ROOT_DIR, ANNOTATION_FILE_PATH_VALID_IMAGE
+from definitions import DATASET_PATH, ROOT_DIR
 import tensorflow as tf
 
 
@@ -90,7 +90,7 @@ def cocoDataGenerator(images, classes, coco, folder=None,
         yield img, mask
 
 colors = [
-    [0, 0, 0],   # Красный
+    [255, 255, 255],   # белый
     [0, 255, 0],   # Зеленый
     [0, 0, 255],   # Синий
     [255, 255, 0]  # Желтый
