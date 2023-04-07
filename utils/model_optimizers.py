@@ -1,11 +1,12 @@
 from keras import optimizers
+import tensorflow as tf
 
 
 def SGD_loss():
     opt = optimizers.SGD(learning_rate=1e-02,
                          # decay=1e-6,
-                         momentum=0.9,
-                         nesterov=True
+                         # momentum=0.9,
+                         # nesterov=True
                          )
     # opt = optimizers.SGD(learning_rate=5,
     #                      decay=6,
@@ -14,8 +15,10 @@ def SGD_loss():
     #                      )
     return opt
 
-def Adam_loss():
-    opt = optimizers.Adam(learning_rate=1e-02,
-                          )
+
+def Adam_opt():
+
+    opt = tf.keras.optimizers.Adam(learning_rate=1e-02,
+                                   epsilon=0.001)
 
     return opt

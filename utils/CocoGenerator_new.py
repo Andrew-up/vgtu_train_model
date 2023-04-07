@@ -5,7 +5,9 @@ import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
+
 from pycocotools.coco import COCO
+
 
 from definitions import DATASET_PATH, ROOT_DIR
 
@@ -93,6 +95,7 @@ class DatasetGeneratorFromCocoJson(tf.keras.utils.Sequence):
             return train_img
         else:
             stacked_img = np.stack((train_img,) * 3, axis=-1)
+            print('stacked_img')
             return stacked_img
 
     def getClassName(self, classID, cats):
@@ -150,10 +153,12 @@ class DatasetGeneratorFromCocoJson(tf.keras.utils.Sequence):
         center = (w / 2, h / 2)
         M = cv2.getRotationMatrix2D(center, angle, scale)
         image = cv2.warpAffine(image, M, (w, h))
-        mask_new = cv2.warpAffine(mask, M, (w, h)).astype(np.uint8)
-        mask_new = mask_new[:, :, np.newaxis]
-
-        return np.array(image), mask_new.astype(np.float32)
+        new_list_mask = []
+        for i in range(mask.shape[-1]):
+            mask_new = cv2.warpAffine(mask[:, :, i], M, (w, h)).astype(np.uint8)
+            new_list_mask.append(mask_new)
+        new_list_mask = np.array(new_list_mask)
+        return np.array(image), new_list_mask
 
     def edit_background(self, img, mask_image_all):
         flip_bool = bool(random.getrandbits(1))
@@ -217,9 +222,12 @@ class DatasetGeneratorFromCocoJson(tf.keras.utils.Sequence):
                 # train_mask = self.getNormalMask(img_info['id'])
             train_mask = self.getLevelsMask(img_info['id'])
             train_mask = np.array(train_mask).astype(np.float32)
-            # if self.aurgment:
-            #     train_img, train_mask = self.add_rotate(train_img, train_mask)
-                # train_img, train_mask = self.add_noise_blur(train_img, train_mask)
+
+            # print(train_mask.shape)
+            if self.aurgment:
+                train_mask = train_mask.transpose((1, 2, 0))
+                train_img, train_mask = self.add_rotate(train_img, train_mask)
+                train_img, train_mask = self.add_noise_blur(train_img, train_mask)
             X[i, ] = train_img
             for j in range(len(self.catIds)):
                 y[i, :, :, j] = train_mask[j]

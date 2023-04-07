@@ -40,7 +40,7 @@ class callback_function():
     def reduce_lr(self):
         _reduce_lr = ReduceLROnPlateau(monitor=self.monitor,
                                        factor=0.05,
-                                       patience=15,
+                                       patience=5,
                                        verbose=1,
                                        min_delta=1e-05,
                                        mode=self.mode,

@@ -4,6 +4,7 @@ import zipfile
 from datetime import datetime
 
 import tensorflow as tf
+from matplotlib import pyplot as plt
 
 from controller_vgtu_train.subprocess_train_model_controller import get_last_model_history, update_model_history
 from definitions import MODEL_H5_PATH, MODEL_H5_FILE_NAME, DATASET_PATH
@@ -24,13 +25,13 @@ def main():
         print(f'Удалено старых моделей h5 и zip архивов: {check_garbage_files_count}')
     timer = time.time()
 
-    images_train, _, coco_train, classes_train = filterDataset(ann_file_name='_annotations.coco.json',
+    images_train, _, coco_train, classes_train = filterDataset(ann_file_name='labels_my-project-name_2022-11-15-02-32-33.json',
                                                                percent_valid=0,
                                                                path_folder='train'
                                                                )
 
     # return 0
-    images_valid, _, coco_valid, classes_valid = filterDataset(ann_file_name='_annotations.coco.json',
+    images_valid, _, coco_valid, classes_valid = filterDataset(ann_file_name='labels_my-project-name_2022-11-15-02-32-33.json',
                                                                percent_valid=0,
                                                                path_folder='valid'
                                                                )
@@ -43,14 +44,29 @@ def main():
     batch_size = 4
     train_gen = DatasetGeneratorFromCocoJson(batch_size=batch_size, image_list=images_train, coco=coco_train,
                                              path_folder=os.path.join(DATASET_PATH, 'train'), classes=classes_train,
-                                             aurgment=False)
+                                             aurgment=True)
 
     val_gen = DatasetGeneratorFromCocoJson(batch_size=batch_size, image_list=images_valid, coco=coco_valid,
                                            path_folder=os.path.join(DATASET_PATH, 'valid'), classes=classes_train,
                                            aurgment=False)
 
     img, mask = train_gen.__getitem__(0)
-    gen_viz(img_s=img, mask_s=mask)
+
+    fig1, axs1 = plt.subplots(nrows=len(mask[:, 0, 0, 0]), ncols=4, figsize=(5, 5))
+    fig1.tight_layout()
+    for i in range(mask.shape[0]):
+        axs1[i][3].imshow(img[i, :, :, :])
+        for j in range(mask.shape[-1]):
+            axs1[i][j].imshow(mask[i, :, :, j])
+            axs1[i][j].set_title(f'Class {j}')
+            axs1[i][j].axis('off')
+    plt.show()
+
+    # return 0
+
+
+    # return 0
+    # gen_viz(img_s=img, mask_s=mask)
     # return 0
     # visualizeImageOrGenerator(images_list=img, mask_list=mask)
     #
@@ -60,7 +76,7 @@ def main():
     # return 0
     model = unet(input_shape=(128, 128, 3), num_classes=len(classes_train))
 
-    tf.keras.utils.plot_model(model, to_file='model_plot.png', show_shapes=True, show_layer_names=True)
+    # tf.keras.utils.plot_model(model, to_file='model_plot.png', show_shapes=True, show_layer_names=True)
 
     # return 0
     path_model = os.path.join(MODEL_H5_PATH, MODEL_H5_FILE_NAME)
@@ -76,7 +92,7 @@ def main():
                           dataset_train=train_gen,
                           dataset_valid=val_gen,
                           dataset_size_train=len(images_train),
-                          # dataset_size_val=len(images_valid),
+                          dataset_size_val=len(images_valid),
                           model_history=model_history,
                           monitor='loss',
                           mode='min'
