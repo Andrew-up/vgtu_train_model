@@ -13,31 +13,6 @@ from utils.CocoGenerator_new import DatasetGeneratorFromCocoJson
 from utils.get_dataset_coco import filterDataset
 from utils.newDataGeneratorCoco import cocoDataGenerator, augmentationsGenerator
 
-colors = [
-    [255, 255, 255],  # фон
-    [0, 255, 0],  # Зеленый
-    [0, 0, 255],  # Синий
-    [255, 255, 0]  # Желтый
-]
-
-def create_mask(pred_mask):
- pred_mask = np.argmax(pred_mask, axis=-1)
- pred_mask = pred_mask[..., tf.newaxis]
- return pred_mask
-
-def color_mask(mask_ggggg):
-    mask = mask_ggggg
-    print(mask_ggggg.shape)
-    colored_mask = np.zeros((mask.shape[0], mask.shape[1], 3), dtype=np.uint8)
-    for i in range(mask.shape[0]):
-        for j in range(mask.shape[1]):
-            # Получаем класс текущего пикселя
-            cls = mask[i, j, 0]
-            # Получаем цвет для данного класса из словаря
-            color = colors[cls]
-            # Раскрашиваем пиксель в соответствующий цвет
-            colored_mask[i, j, :] = color
-    return colored_mask
 
 class MyMeanIOU(tf.keras.metrics.MeanIoU):
     def update_state(self, y_true, y_pred, sample_weight=None):
@@ -100,42 +75,45 @@ def viz_model():
     plt.imshow(display_grid, aspect='auto', cmap='viridis')
     plt.show()
 
+def iou_coef(y_true, y_pred, smooth=1):
+    intersection = K.sum(K.abs(y_true * y_pred), axis=[1, 2, 3])
+    union = K.sum(y_true, [1, 2, 3]) + K.sum(y_pred, [1, 2, 3]) - intersection
+    iou = K.mean((intersection + smooth) / (union + smooth), axis=0)
+    return iou
+
+def dice_loss(y_true, y_pred):
+    numerator = tf.reduce_sum(y_true * y_pred)
+    denominator = tf.reduce_sum(y_true * y_true) + tf.reduce_sum(y_pred * y_pred) - tf.reduce_sum(y_true * y_pred)
+    return 1 - numerator / denominator
+
+
+colors = np.array([
+    [0, 0, 0],    # Цвет для класса 0
+    [255, 0, 0],  # Цвет для класса 1
+    [0, 255, 0],  # Цвет для класса 2
+    [0, 0, 255],  # Цвет для класса 3
+    [255, 255, 0] # Цвет для класса 4
+])
+
 
 def show_mask_true_and_predict():
-    images_train, images_valid, coco, classes = filterDataset(ann_file_name='_annotations.coco.json', percent_valid=0, shuffie=False, path_folder='train')
+    images_train, images_valid, coco, classes = filterDataset(ann_file_name='labels_my-project-name_2022-11-15-02-32-33.json', percent_valid=0, shuffie=False, path_folder='train')
     paths_m = os.path.join(MODEL_H5_PATH, 'model_1_0_19.h5')
     dddd = MyMeanIOU(num_classes=3)
     model = load_model(paths_m, custom_objects={
-        'dice_coef': dice_coef,
+        'iou_coef': iou_coef,
         'MyMeanIOU': dddd,
-        # 'dice_coef': dice_coef,
+        'dice_loss': dice_loss,
         # 'jaccard_coef': jaccard_coef
     })
     train_gen = DatasetGeneratorFromCocoJson(batch_size=4, image_list=images_train, coco=coco,
                                              path_folder=os.path.join(DATASET_PATH, 'train'), classes=classes, aurgment=True)
-    for i in range(10):
+    for i in range(1):
         img, mask = train_gen.__getitem__(i)
         pre = model.predict(img)
-        fig, ax = plt.subplots(ncols=3, nrows=4)
-        ax[0][0].title.set_text('original image')
-        ax[0][1].title.set_text('original mask')
-        ax[0][2].title.set_text('predict mask image')
-
-        # y_pred3 = np.argmax(y_pred[i], axis=-1)
+        gen_viz(img_s=img, mask_s= mask, pred=pre)
 
 
-        for i in range(4):
-            # y_pred3 = np.argmax(y_pred[i], axis=-1)
-            ax[i][0].imshow(img[i])
-            ax[i][1].imshow(color_mask(create_mask(mask[i])))
-            # jjjjjjjj = pre[i, :, :, :]
-            predmask = color_mask(create_mask(pre[i]))
-            ax[i][2].imshow(predmask)
-            # ax[i][0].axis('off')
-            # ax[i][1].axis('off')
-            # ax[i][2].axis('off')
-
-        plt.show()
 
 def gen_viz(img_s, mask_s, pred = None):
     print(img_s.shape)
@@ -155,6 +133,7 @@ def gen_viz(img_s, mask_s, pred = None):
 
         images, mask = img_s[i], mask_s[i]
         sample_img = images / 255.
+        print(mask.shape)
         mask1 = mask[:, :, 0]
         mask2 = mask[:, :, 1]
         mask3 = mask[:, :, 2]
@@ -184,14 +163,14 @@ def gen_viz(img_s, mask_s, pred = None):
         if pred is not None:
 
             pre = pred[i]
-            predict1 = pre[:, :, 0]
-            predict1 = (predict1 > 0.5).astype(np.float32)
+            predict1 = pre[:, :, ]> 0.8
+            predict1 = (predict1 ).astype(np.float32)
             predict1 = np.array(predict1)
-            predict2 = pre[:, :, 1]
-            predict2 = (predict2 > 0.5).astype(np.float32)
+            predict2 = pre[:, :, 1] > 0.8
+            predict2 = (predict2).astype(np.float32)
             predict2 = np.array(predict2)
-            predict3 = pre[:, :, 2]
-            predict3 = (predict3 > 0.5).astype(np.float32)
+            predict3 = pre[:, :, 2] > 0.85
+            predict3 = (predict3).astype(np.float32)
             predict3 = np.array(predict3)
             l0 = ax2.imshow(sample_img[:, :, 0], cmap='gray')
             l1 = ax2.imshow(np.ma.masked_where(
@@ -201,7 +180,6 @@ def gen_viz(img_s, mask_s, pred = None):
             l3 = ax2.imshow(np.ma.masked_where(
                 predict3 == False, predict3), cmap=cmap3, alpha=1)
             _ = [ax.set_axis_off() for ax in [ax0, ax1]]
-
 
         colors = [im.cmap(im.norm(1)) for im in [l1, l2, l3]]
 

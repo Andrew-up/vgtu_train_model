@@ -10,6 +10,8 @@ from keras.losses import binary_crossentropy
 from keras.optimizers import Adam
 from keras_unet.models import custom_unet
 
+from utils.loss_functions import Semantic_loss_functions
+from utils.model_losses import dice_loss_fun
 from utils.model_optimizers import SGD_loss, Adam_opt
 
 
@@ -17,29 +19,34 @@ class MyMeanIOU(tf.keras.metrics.MeanIoU):
     def update_state(self, y_true, y_pred, sample_weight=None):
         return super().update_state(tf.argmax(y_true, axis=-1), tf.argmax(y_pred, axis=-1), sample_weight)
 
-def iou_coef(y_true, y_pred, smooth=1):
-    intersection = K.sum(K.abs(y_true * y_pred), axis=[1, 2, 3])
-    union = K.sum(y_true, [1, 2, 3]) + K.sum(y_pred, [1, 2, 3]) - intersection
-    iou = K.mean((intersection + smooth) / (union + smooth), axis=0)
-    return iou
+class DiceLoss(tf.keras.losses.Loss):
+    def __init__(self, smooth=1e-6, gama=2):
+        super(DiceLoss, self).__init__()
+        self.name = 'NDL'
+        self.smooth = smooth
+        self.gama = gama
 
-def dice_loss(y_true, y_pred):
-    numerator = tf.reduce_sum(y_true * y_pred)
-    denominator = tf.reduce_sum(y_true * y_true) + tf.reduce_sum(y_pred * y_pred) - tf.reduce_sum(y_true * y_pred)
-    return 1 - numerator / denominator
+    def call(self, y_true, y_pred):
+        y_true, y_pred = tf.cast(
+            y_true, dtype=tf.float32), tf.cast(y_pred, tf.float32)
+        nominator = 2 * \
+            tf.reduce_sum(tf.multiply(y_pred, y_true)) + self.smooth
+        denominator = tf.reduce_sum(
+            y_pred ** self.gama) + tf.reduce_sum(y_true ** self.gama) + self.smooth
+        result = 1 - tf.divide(nominator, denominator)
+        return result
 
 def unet(num_classes=None, input_shape=(128, 128, 3)):
-
     model = custom_unet(
         input_shape=input_shape,
         use_batch_norm=True,
         num_classes=num_classes,
         filters=32,
-        num_layers=5,
+        num_layers=4,
         dropout=0.3,
         activation="relu",
         output_activation='softmax'
     )
     iou = MyMeanIOU(num_classes=num_classes)
-    model.compile(optimizer=Adam_opt(), loss=dice_loss, metrics=[iou_coef, iou, 'accuracy'])
+    model.compile(optimizer=SGD_loss(), loss=DiceLoss(), metrics=[iou, 'accuracy'])
     return model

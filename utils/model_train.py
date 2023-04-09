@@ -23,22 +23,26 @@ class PrintTrueAndPred(tf.keras.callbacks.Callback):
     def on_epoch_end(self, epoch, logs=None):
         img, mask_original = self.generator.__getitem__(0)
         y_pred = self.model.predict(img, verbose=1)
-        mask = y_pred
-        labels = ['class 1', 'class 2', 'class 3']
-        fig1, axs1 = plt.subplots(nrows=len(mask[:, 0, 0, 0]), ncols=4, figsize=(8, 8))
-        fig1.suptitle(f'epoch: {epoch}', fontsize=20, fontweight='bold')
-        fig1.tight_layout()
-        axs1[0][3].set_title(f'Оригинальное фото')
-        for ssss in range(mask.shape[-1]):
-            axs1[0][ssss].set_title(f'{labels[ssss]}')
 
-        for i in range(mask.shape[0]):
-            axs1[i][3].imshow(img[i, :, :, :])
-            axs1[i][3].axis('off')
-            for j in range(mask.shape[-1]):
-                axs1[i][j].imshow(mask[i, :, :, j] > 0.8)
-                axs1[i][j].axis('off')
-        plt.show()
+        sssssssp = y_pred[0]
+
+        gen_viz(img_s=img, mask_s=mask_original, pred=y_pred)
+        # mask = y_pred
+        # labels = ['class 1', 'class 2', 'class 3']
+        # fig1, axs1 = plt.subplots(nrows=len(mask[:, 0, 0, 0]), ncols=4, figsize=(8, 8))
+        # fig1.suptitle(f'epoch: {epoch}', fontsize=20, fontweight='bold')
+        # fig1.tight_layout()
+        # axs1[0][3].set_title(f'Оригинальное фото')
+        # for ssss in range(mask.shape[-1]):
+        #     axs1[0][ssss].set_title(f'{labels[ssss]}')
+        #
+        # for i in range(mask.shape[0]):
+        #     axs1[i][3].imshow(img[i, :, :, :])
+        #     axs1[i][3].axis('off')
+        #     for j in range(mask.shape[-1]):
+        #         axs1[i][j].imshow(mask[i, :, :, j] > 0.8)
+        #         axs1[i][j].axis('off')
+        # plt.show()
 
 def train_model(model: Sequential,
                 n_epoch,
@@ -65,8 +69,8 @@ def train_model(model: Sequential,
     checkpoint = callback.checkpoint()
     print_test = callback.print_test()
     early_stop_train = callback.early_stopping()
-    steps_per_epoch = int(dataset_size_train // batch_size)
-    validation_steps = int((dataset_size_val // batch_size)//3)
+    steps_per_epoch = int(dataset_size_train // batch_size) * 60
+    validation_steps = int((dataset_size_val // batch_size) * 10)
 
     history = model.fit(
         dataset_train,
