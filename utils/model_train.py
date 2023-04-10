@@ -13,7 +13,6 @@ from utils.model_callbacks import callback_function
 import keras.backend as K
 
 from utils.vizualizators import gen_viz
-from utils.zaebalo_vse import visualizeGenerator
 
 
 class PrintTrueAndPred(tf.keras.callbacks.Callback):
@@ -76,7 +75,7 @@ def train_model(model: Sequential,
     print_test = callback.print_test()
     early_stop_train = callback.early_stopping()
     steps_per_epoch = int(dataset_size_train // batch_size)
-    validation_steps = int((dataset_size_val // batch_size) / 3)
+    validation_steps = int((dataset_size_val // batch_size) // 5)
 
     history = model.fit(
         dataset_train,
@@ -84,7 +83,9 @@ def train_model(model: Sequential,
         validation_steps=validation_steps,
         steps_per_epoch=steps_per_epoch,
         epochs=n_epoch,
-        callbacks=[tb_callback, reduce_lr, checkpoint, checkpoint2, PrintTrueAndPred(dataset_train)],
+        callbacks=[tb_callback, reduce_lr, checkpoint, checkpoint2,
+                   # PrintTrueAndPred(dataset_train)
+                   ],
         verbose=True,
         shuffle=False
     )

@@ -8,7 +8,6 @@ import tensorflow as tf
 
 from pycocotools.coco import COCO
 import keras.backend as K
-from sklearn.preprocessing import OneHotEncoder
 from definitions import DATASET_PATH, ROOT_DIR
 
 colors = [
@@ -218,15 +217,16 @@ class DatasetGeneratorFromCocoJson(tf.keras.utils.Sequence):
         y = np.empty((self.batch_size, self.input_image_size[0], self.input_image_size[1], 1))
         # print(f'i: {i}')
 
-        # indexes = self.indexes[index * self.batch_size: (index + 1) * self.batch_size]
-        for i in range(self.c, self.c+self.batch_size):
+        indexes = self.indexes[index * self.batch_size: (index + 1) * self.batch_size]
+        # print(indexes)
+        for i in range(len(indexes)):
 
             if not self.image_list:
                 print('СПИСОК ИЗОБРАЖЕНИЙ ПУСТ')
                 break
 
-            # value = indexes[i]
-            img_info = self.image_list[i]
+            value = indexes[i]
+            img_info = self.image_list[value]
             # print(img_info)
             train_img = self.getImage(imageObj=img_info, dir_images=self.img_folder)
             if self.mask_type == 'categorical':
@@ -240,9 +240,9 @@ class DatasetGeneratorFromCocoJson(tf.keras.utils.Sequence):
             if self.aurgment:
                 train_img, train_mask = self.add_rotate(train_img, train_mask)
                 train_img, train_mask = self.add_noise_blur(train_img, train_mask)
-            X[i - self.c] = train_img
+            X[i, ] = train_img
             # print(train_mask.shape)
-            y[i - self.c, :, :, :] = train_mask
+            y[i, :, :, :] = train_mask
 
             for j in range(len(self.catIds)):
                 pass
@@ -259,12 +259,25 @@ class DatasetGeneratorFromCocoJson(tf.keras.utils.Sequence):
             self.c = 0
             random.shuffle(self.image_list)
 
-
+        # if self.aurgment:
+        #     X, y = self.edit_background(X, y)
 
         # ohe_hot_mask = tf.keras.utils.to_categorical(mask, num_classes=len(self.classes)+1)
         img = np.array(X).astype(np.float32)
         mask = np.array(y).astype(np.float32)
+        mask_one_hot = tf.keras.utils.to_categorical(mask, num_classes=len(self.classes)+1)
+        # mask111 = [[0], [1], [2], [3]]
+        #
+        # mask_ohe = tf.one_hot(tf.squeeze(mask111), len(self.classes)+1, on_value=1.0, off_value=0.0)
+        # mask_ohe111 = mask_ohe[:, 1:]
 
-        mask = tf.keras.utils.to_categorical(mask, num_classes=len(self.classes)+1)
+        mask_one_hot111111 = mask_one_hot[:, :, :, 1:]
+        return img, mask_one_hot111111
 
-        return img, mask
+
+def to_categorical_ignore_zero(y, num_classes):
+    # Игнорируем класс 0
+    y = np.array(y) - 1
+    y = y.clip(0, num_classes - 1)
+    # Преобразуем метки в one-hot кодированный формат
+    return np.eye(num_classes)[y]

@@ -16,7 +16,6 @@ from utils.model_losses import plot_segm_history
 from utils.model_train import train_model
 from utils.unet import unet
 from utils.vizualizators import gen_viz
-from utils.zaebalo_vse import cocoDataGenerator, visualizeGenerator
 
 
 def main():
@@ -27,13 +26,13 @@ def main():
         print(f'Удалено старых моделей h5 и zip архивов: {check_garbage_files_count}')
     timer = time.time()
 
-    images_train, _, coco_train, classes_train = filterDataset(ann_file_name='data.json',
+    images_train, _, coco_train, classes_train = filterDataset(ann_file_name='labels_my-project-name_2022-11-15-02-32-33.json',
                                                                percent_valid=0,
                                                                path_folder='train'
                                                                )
 
     # return 0
-    images_valid, _, coco_valid, classes_valid = filterDataset(ann_file_name='data.json',
+    images_valid, _, coco_valid, classes_valid = filterDataset(ann_file_name='labels_my-project-name_2022-11-15-02-32-33.json',
                                                                percent_valid=0,
                                                                path_folder='train'
                                                                )
@@ -73,8 +72,8 @@ def main():
     # for j in range(10):
     img, mask = next(train_gen)
 
-    visualizeGenerator(gen=None, img=img, pred=mask)
-    visualizeGenerator(val_gen)
+    # visualizeGenerator(gen=None, img=img, pred=mask)
+    # visualizeGenerator(val_gen)
 
     gen_viz(img_s=img, mask_s=mask)
 
@@ -107,7 +106,7 @@ def main():
     # visualizeImageOrGenerator(images_list=img1, mask_list=mask1)
 
     # model = unet_plus_plus(input_shape=(input_image_size[0], input_image_size[1], 3), num_classes=len(classes_train))
-    model = unet(input_shape=(input_image_size[0], input_image_size[1], 3), num_classes=len(classes_train)+1)
+    model = unet(input_shape=(input_image_size[0], input_image_size[1], 3), num_classes=len(classes_train))
     print(model.summary())
     # tf.keras.utils.plot_model(model, to_file='model_plot.png', show_shapes=True, show_layer_names=True)
 
@@ -127,11 +126,11 @@ def main():
                           dataset_size_train=len(images_train),
                           dataset_size_val=len(images_valid),
                           model_history=model_history,
-                          monitor='my_mean_iou',
+                          monitor='dice_coef',
                           mode='max'
                           )
 
-    plot_segm_history(history, metrics=['my_mean_iou', 'val_my_mean_iou'])
+    plot_segm_history(history, metrics=['my_dice_coef', 'val_dice_coef'])
 
     path_zip = zipfile.ZipFile(f'{os.path.splitext(path_model)[0]}.zip', 'w')
     path_zip.write(path_model, arcname=f'{model_history.name_file}')
