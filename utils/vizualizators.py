@@ -134,9 +134,9 @@ def gen_viz(img_s, mask_s, pred = None):
         images, mask = img_s[i], mask_s[i]
         sample_img = images / 255.
         # print(mask.shape)
-        mask1 = mask[:, :, 0]
-        mask2 = mask[:, :, 1]
-        mask3 = mask[:, :, 2]
+        mask1 = mask[:, :, 1]
+        mask2 = mask[:, :, 2]
+        mask3 = mask[:, :, 3]
 
         ax0 = fig.add_subplot(gs[i, 0])
         im = ax0.imshow(sample_img[:, :, 0], cmap='gray')
@@ -163,13 +163,13 @@ def gen_viz(img_s, mask_s, pred = None):
         if pred is not None:
 
             pre = pred[i]
-            predict1 = pre[:, :, 0] > 0.8
+            predict1 = pre[:, :, 1] > 0.4
             predict1 = (predict1).astype(np.float32)
             predict1 = np.array(predict1)
-            predict2 = pre[:, :, 1] > 0.8
+            predict2 = pre[:, :, 2] > 0.4
             predict2 = (predict2).astype(np.float32)
             predict2 = np.array(predict2)
-            predict3 = pre[:, :, 2] > 0.8
+            predict3 = pre[:, :, 3] > 0.4
             predict3 = (predict3).astype(np.float32)
             predict3 = np.array(predict3)
             l0 = ax2.imshow(sample_img[:, :, 0], cmap='gray')

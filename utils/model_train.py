@@ -26,9 +26,10 @@ class PrintTrueAndPred(tf.keras.callbacks.Callback):
         y_pred = self.model.predict(img, verbose=1)
 
         # sssssssp = y_pred[0]
-
+        # if epoch//5 == 0:
+        #     print(epoch)
         gen_viz(img_s=img, mask_s=mask_original, pred=y_pred)
-        visualizeGenerator(gen=None, img=img, pred=y_pred)
+        # visualizeGenerator(gen=None, img=img, pred=y_pred)
         # mask = y_pred
         # labels = ['class 1', 'class 2', 'class 3']
         # fig1, axs1 = plt.subplots(nrows=len(mask[:, 0, 0, 0]), ncols=4, figsize=(8, 8))
@@ -45,6 +46,8 @@ class PrintTrueAndPred(tf.keras.callbacks.Callback):
         #         axs1[i][j].imshow(mask[i, :, :, j] > 0.8)
         #         axs1[i][j].axis('off')
         # plt.show()
+
+
 
 def train_model(model: Sequential,
                 n_epoch,

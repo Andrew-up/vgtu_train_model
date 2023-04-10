@@ -9,3 +9,4 @@ waitress~=2.1.2
 segmentation-models==1.0.1
 keras-unet==0.1.2
 requests~=2.28.2
+scikit-learn==1.2.2

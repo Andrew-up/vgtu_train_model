@@ -8,7 +8,7 @@ import tensorflow as tf
 
 from pycocotools.coco import COCO
 import keras.backend as K
-
+from sklearn.preprocessing import OneHotEncoder
 from definitions import DATASET_PATH, ROOT_DIR
 
 colors = [
@@ -79,8 +79,8 @@ class DatasetGeneratorFromCocoJson(tf.keras.utils.Sequence):
         np.random.shuffle(self.image_list)
 
     def __len__(self):
-        return 999999999999
-        # return int(len(self.image_list) / self.batch_size)
+        # return 999999999999
+        return int(len(self.image_list) / self.batch_size)
 
     def getImagePathByCocoId(self, image_id):
         image = self.coco.loadImgs([image_id])[0]
@@ -92,7 +92,7 @@ class DatasetGeneratorFromCocoJson(tf.keras.utils.Sequence):
         # print(imagepath)
         if not os.path.exists(imagepath):
             print(f'Не могу найти путь: {imagepath}')
-        train_img = cv2.imread(imagepath, cv2.IMREAD_ANYDEPTH)
+        train_img = cv2.imread(imagepath, cv2.COLOR_BGR2RGB)
         train_img = cv2.resize(train_img, (self.input_image_size))
         # train_img = cv2.resize(train_img, self.input_image_size) / 255).astype(np.float32)
         train_img = train_img.astype(np.float32) / 255.
@@ -137,7 +137,7 @@ class DatasetGeneratorFromCocoJson(tf.keras.utils.Sequence):
             # new_mask = self.checkMaskPixelIsClassId(mask=new_mask, classId=pixel_value)
             train_mask = np.maximum(new_mask, train_mask)
             pass
-        # train_mask = train_mask[:, :, np.newaxis]
+        train_mask = train_mask[:, :, np.newaxis]
         # train_mask = train_mask.reshape((self.input_image_size[0], self.input_image_size[1], 1))
         return train_mask
 
@@ -167,6 +167,7 @@ class DatasetGeneratorFromCocoJson(tf.keras.utils.Sequence):
             mask_new = cv2.warpAffine(mask[:, :, i], M, (w, h)).astype(np.uint8)
             new_list_mask.append(mask_new)
         new_list_mask = np.array(new_list_mask)
+        new_list_mask = np.transpose(new_list_mask, (1, 2, 0))
         return np.array(image), new_list_mask
 
     def edit_background(self, img, mask_image_all):
@@ -209,11 +210,12 @@ class DatasetGeneratorFromCocoJson(tf.keras.utils.Sequence):
         return np.array(img_list), np.array(mask_image_all)
 
     def __iter__(self):
+        print('__iter__')
         return self.__getitem__(self.c)
 
     def __getitem__(self, index):
         X = np.empty((self.batch_size, self.input_image_size[0], self.input_image_size[1], 3))
-        y = np.empty((self.batch_size, self.input_image_size[0], self.input_image_size[1], len(self.classes)))
+        y = np.empty((self.batch_size, self.input_image_size[0], self.input_image_size[1], 1))
         # print(f'i: {i}')
 
         # indexes = self.indexes[index * self.batch_size: (index + 1) * self.batch_size]
@@ -231,22 +233,23 @@ class DatasetGeneratorFromCocoJson(tf.keras.utils.Sequence):
                 pass
 
                 # train_mask = self.getNormalMask(img_info['id'])
-            train_mask = self.getLevelsMask(img_info['id'])
+            train_mask = self.getNormalMask(img_info['id'], self.catIds)
             train_mask = np.array(train_mask).astype(np.uint8)
 
             # print(train_mask.shape)
             if self.aurgment:
-                train_mask = train_mask.transpose((1, 2, 0))
                 train_img, train_mask = self.add_rotate(train_img, train_mask)
                 train_img, train_mask = self.add_noise_blur(train_img, train_mask)
-            X[i-self.c] = train_img
+            X[i - self.c] = train_img
             # print(train_mask.shape)
+            y[i - self.c, :, :, :] = train_mask
 
             for j in range(len(self.catIds)):
+                pass
                 # plt.imshow(train_mask[j])
                 # plt.title(str(j))
                 # plt.show()
-                y[i-self.c, :, :, j] = train_mask[j]
+
                 # mask[i, :, :, j] = train_mask[j]
                 # mask[i, :, :, j] = train_mask[j]
 
@@ -259,10 +262,9 @@ class DatasetGeneratorFromCocoJson(tf.keras.utils.Sequence):
 
 
         # ohe_hot_mask = tf.keras.utils.to_categorical(mask, num_classes=len(self.classes)+1)
-        img = np.array(X).astype(np.float64)
-        mask = np.array(y).astype(np.float64)
+        img = np.array(X).astype(np.float32)
+        mask = np.array(y).astype(np.float32)
 
-        # if self.aurgment:
-        #     img, mask = self.edit_background(img, mask)
+        mask = tf.keras.utils.to_categorical(mask, num_classes=len(self.classes)+1)
 
         return img, mask
