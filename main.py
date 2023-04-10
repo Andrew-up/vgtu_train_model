@@ -16,7 +16,7 @@ from utils.model_losses import plot_segm_history
 from utils.model_train import train_model
 from utils.unet import unet
 from utils.vizualizators import gen_viz
-
+from utils.zaebalo_vse import cocoDataGenerator, visualizeGenerator
 
 
 def main():
@@ -33,10 +33,10 @@ def main():
                                                                )
 
     # return 0
-    # images_valid, _, coco_valid, classes_valid = filterDataset(ann_file_name='labels_my-project-name_2022-11-15-02-32-33.json',
-    #                                                            percent_valid=0,
-    #                                                            path_folder='valid'
-    #                                                            )
+    images_valid, _, coco_valid, classes_valid = filterDataset(ann_file_name='data.json',
+                                                               percent_valid=0,
+                                                               path_folder='train'
+                                                               )
 
     print(f'РАЗМЕР ДАТАСЕТА ДЛЯ ТРЕНИРОВКИ: {len(images_train)}')
     print(f'РАЗМЕР ДАТАСЕТА ДЛЯ ВАЛИДАЦИИ: {len(images_train)}')
@@ -44,34 +44,57 @@ def main():
     print(classes_train)
     input_image_size = (128, 128)
     batch_size = 4
+    # train_gen = cocoDataGenerator(
+    #     images_train,
+    #     classes_train,
+    #     coco_train,
+    #     folder='train',
+    #     mask_type="normal",
+    #     input_image_size=(128, 128),
+    #     batch_size=batch_size,
+    # )
+    # val_gen = cocoDataGenerator(
+    #     images_train,
+    #     classes_train,
+    #     coco_train,
+    #     folder='train',
+    #     mask_type="normal",
+    #     input_image_size=(128, 128),
+    #     batch_size=batch_size,
+    # )
+
     train_gen = DatasetGeneratorFromCocoJson(batch_size=batch_size, image_list=images_train, coco=coco_train,
                                              path_folder=os.path.join(DATASET_PATH, 'train'), classes=classes_train,
-                                             aurgment=True,
-                                             input_image_size=input_image_size)
+                                             aurgment=False, input_image_size=input_image_size)
 
     val_gen = DatasetGeneratorFromCocoJson(batch_size=batch_size, image_list=images_train, coco=coco_train,
                                            path_folder=os.path.join(DATASET_PATH, 'train'), classes=classes_train,
                                            aurgment=False, input_image_size=input_image_size)
     # for j in range(10):
-    img, mask = train_gen.__getitem__(0)
-    # return 0
+    img, mask = next(train_gen)
+
+    visualizeGenerator(gen=None, img=img, pred=mask)
+    visualizeGenerator(val_gen)
+
     gen_viz(img_s=img, mask_s=mask)
-    # return 0
-
-    fig1, axs1 = plt.subplots(nrows=len(mask[:, 0, 0, 0]), ncols=4, figsize=(5, 5))
-    fig1.tight_layout()
-    for i in range(mask.shape[0]):
-        axs1[i][3].imshow(img[i, :, :, :])
-        for j in range(mask.shape[-1]):
-            axs1[i][j].imshow(mask[i, :, :, j])
-            axs1[i][j].set_title(f'Class {j}')
-            axs1[i][j].axis('off')
-    plt.show()
-
-
 
     # return 0
 
+    # return 0
+    # gen_viz(img_s=img, mask_s=mask)
+    # return 0
+
+    # fig1, axs1 = plt.subplots(nrows=len(mask[:, 0, 0, 0]), ncols=4, figsize=(5, 5))
+    # fig1.tight_layout()
+    # for i in range(mask.shape[0]):
+    #     axs1[i][3].imshow(img[i, :, :, :])
+    #     for j in range(mask.shape[-1]):
+    #         axs1[i][j].imshow(mask[i, :, :, j])
+    #         axs1[i][j].set_title(f'Class {j}')
+    #         axs1[i][j].axis('off')
+    # plt.show()
+
+    # return 0
 
     # return 0
 
@@ -80,7 +103,6 @@ def main():
     #
     # img1, mask1 = val_gen.__getitem__(0)
     # visualizeImageOrGenerator(images_list=img1, mask_list=mask1)
-
 
     # model = unet_plus_plus(input_shape=(input_image_size[0], input_image_size[1], 3), num_classes=len(classes_train))
     model = unet(input_shape=(input_image_size[0], input_image_size[1], 3), num_classes=len(classes_train))
@@ -96,12 +118,12 @@ def main():
 
     history = train_model(path_model=path_model,
                           model=model,
-                          n_epoch=1000,
+                          n_epoch=800,
                           batch_size=batch_size,
                           dataset_train=train_gen,
                           dataset_valid=val_gen,
                           dataset_size_train=len(images_train),
-                          dataset_size_val=len(images_train),
+                          dataset_size_val=len(images_valid),
                           model_history=model_history,
                           monitor='loss',
                           mode='min'

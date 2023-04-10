@@ -19,34 +19,23 @@ class MyMeanIOU(tf.keras.metrics.MeanIoU):
     def update_state(self, y_true, y_pred, sample_weight=None):
         return super().update_state(tf.argmax(y_true, axis=-1), tf.argmax(y_pred, axis=-1), sample_weight)
 
-class DiceLoss(tf.keras.losses.Loss):
-    def __init__(self, smooth=1e-6, gama=2):
-        super(DiceLoss, self).__init__()
-        self.name = 'NDL'
-        self.smooth = smooth
-        self.gama = gama
 
-    def call(self, y_true, y_pred):
-        y_true, y_pred = tf.cast(
-            y_true, dtype=tf.float32), tf.cast(y_pred, tf.float32)
-        nominator = 2 * \
-            tf.reduce_sum(tf.multiply(y_pred, y_true)) + self.smooth
-        denominator = tf.reduce_sum(
-            y_pred ** self.gama) + tf.reduce_sum(y_true ** self.gama) + self.smooth
-        result = 1 - tf.divide(nominator, denominator)
-        return result
+def dice_loss(y_true, y_pred):
+    numerator = tf.reduce_sum(y_true * y_pred)
+    denominator = tf.reduce_sum(y_true * y_true) + tf.reduce_sum(y_pred * y_pred) - tf.reduce_sum(y_true * y_pred)
+    return 1 - numerator / denominator
 
 def unet(num_classes=None, input_shape=(128, 128, 3)):
     model = custom_unet(
         input_shape=input_shape,
         use_batch_norm=True,
         num_classes=num_classes,
-        filters=32,
+        filters=64,
         num_layers=4,
-        dropout=0.3,
+        dropout=0.2,
         activation="relu",
         output_activation='softmax'
     )
     iou = MyMeanIOU(num_classes=num_classes)
-    model.compile(optimizer=SGD_loss(), loss=DiceLoss(), metrics=[iou, 'accuracy'])
+    model.compile(optimizer=SGD_loss(), loss=dice_loss, metrics=[iou, 'accuracy'])
     return model

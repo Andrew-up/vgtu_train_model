@@ -18,7 +18,7 @@ def SGD_loss():
 
 def Adam_opt():
 
-    opt = tf.keras.optimizers.Adam(learning_rate=1e-02,
+    opt = tf.keras.optimizers.Adam(learning_rate=1e-04,
                                    epsilon=0.001)
 
     return opt

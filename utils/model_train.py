@@ -13,6 +13,7 @@ from utils.model_callbacks import callback_function
 import keras.backend as K
 
 from utils.vizualizators import gen_viz
+from utils.zaebalo_vse import visualizeGenerator
 
 
 class PrintTrueAndPred(tf.keras.callbacks.Callback):
@@ -21,12 +22,13 @@ class PrintTrueAndPred(tf.keras.callbacks.Callback):
         self.generator = generator
 
     def on_epoch_end(self, epoch, logs=None):
-        img, mask_original = self.generator.__getitem__(0)
+        img, mask_original = next(self.generator)
         y_pred = self.model.predict(img, verbose=1)
 
-        sssssssp = y_pred[0]
+        # sssssssp = y_pred[0]
 
         gen_viz(img_s=img, mask_s=mask_original, pred=y_pred)
+        visualizeGenerator(gen=None, img=img, pred=y_pred)
         # mask = y_pred
         # labels = ['class 1', 'class 2', 'class 3']
         # fig1, axs1 = plt.subplots(nrows=len(mask[:, 0, 0, 0]), ncols=4, figsize=(8, 8))
@@ -67,10 +69,11 @@ def train_model(model: Sequential,
     tb_callback = callback.tb_callback()
     reduce_lr = callback.reduce_lr()
     checkpoint = callback.checkpoint()
+    checkpoint2 = callback.checkpoint2()
     print_test = callback.print_test()
     early_stop_train = callback.early_stopping()
-    steps_per_epoch = int(dataset_size_train // batch_size) * 60
-    validation_steps = int((dataset_size_val // batch_size) * 10)
+    steps_per_epoch = int(dataset_size_train // batch_size)
+    validation_steps = int((dataset_size_val // batch_size) / 3)
 
     history = model.fit(
         dataset_train,
@@ -78,7 +81,7 @@ def train_model(model: Sequential,
         validation_steps=validation_steps,
         steps_per_epoch=steps_per_epoch,
         epochs=n_epoch,
-        callbacks=[tb_callback, reduce_lr, checkpoint, print_test, PrintTrueAndPred(dataset_train)],
+        callbacks=[tb_callback, reduce_lr, checkpoint, checkpoint2, PrintTrueAndPred(dataset_train)],
         verbose=True,
         shuffle=False
     )

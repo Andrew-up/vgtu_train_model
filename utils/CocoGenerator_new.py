@@ -109,7 +109,8 @@ class DatasetGeneratorFromCocoJson(tf.keras.utils.Sequence):
             if cats[i]['id'] == classID:
                 return cats[i]['name']
         return None
-
+    def __next__(self):
+        return self.__getitem__(self.c)
     def checkMaskPixelIsClassId(self, mask, classId):
         newmask = mask.copy()
         for i in range(mask.shape[0]):
@@ -258,10 +259,10 @@ class DatasetGeneratorFromCocoJson(tf.keras.utils.Sequence):
 
 
         # ohe_hot_mask = tf.keras.utils.to_categorical(mask, num_classes=len(self.classes)+1)
-        img = np.array(X).astype(np.float32)
-        mask = np.array(y).astype(np.float32)
+        img = np.array(X).astype(np.float64)
+        mask = np.array(y).astype(np.float64)
 
         # if self.aurgment:
         #     img, mask = self.edit_background(img, mask)
 
-        return img.astype(np.float32), mask
+        return img, mask

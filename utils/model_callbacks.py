@@ -36,6 +36,16 @@ class callback_function():
             monitor=self.monitor
         )
         return _checkpoint
+    def checkpoint2(self):
+        _checkpoint = ModelCheckpoint(
+            filepath='model_iou.h5',
+            verbose=1,
+            save_best_only=True,
+            save_weights_only=False,
+            mode='max',
+            monitor='my_mean_iou'
+        )
+        return _checkpoint
 
     def reduce_lr(self):
         _reduce_lr = ReduceLROnPlateau(monitor=self.monitor,
