@@ -12,7 +12,7 @@ from model.model_history import ModelHistory
 from utils.model_callbacks import callback_function
 import keras.backend as K
 
-from utils.vizualizators import gen_viz
+from utils.vizualizators import gen_viz, visualizeGenerator
 
 
 class PrintTrueAndPred(tf.keras.callbacks.Callback):
@@ -27,7 +27,7 @@ class PrintTrueAndPred(tf.keras.callbacks.Callback):
         # sssssssp = y_pred[0]
         # if epoch//5 == 0:
         #     print(epoch)
-        gen_viz(img_s=img, mask_s=mask_original, pred=y_pred)
+        gen_viz(img_s=img, mask_s=mask_original, pred=y_pred, epoch=f"{epoch}. iou: {round(logs['my_mean_iou'], 3)}")
         # visualizeGenerator(gen=None, img=img, pred=y_pred)
         # mask = y_pred
         # labels = ['class 1', 'class 2', 'class 3']
@@ -74,8 +74,8 @@ def train_model(model: Sequential,
     checkpoint2 = callback.checkpoint2()
     print_test = callback.print_test()
     early_stop_train = callback.early_stopping()
-    steps_per_epoch = int(dataset_size_train // batch_size)
-    validation_steps = int((dataset_size_val // batch_size) // 5)
+    steps_per_epoch = math.floor(dataset_size_train // batch_size) * 3
+    validation_steps = math.floor((dataset_size_val // batch_size))
 
     history = model.fit(
         dataset_train,
@@ -83,8 +83,9 @@ def train_model(model: Sequential,
         validation_steps=validation_steps,
         steps_per_epoch=steps_per_epoch,
         epochs=n_epoch,
-        callbacks=[tb_callback, reduce_lr, checkpoint, checkpoint2,
-                   # PrintTrueAndPred(dataset_train)
+        callbacks=[tb_callback, reduce_lr, checkpoint,
+                   # checkpoint2,
+                   PrintTrueAndPred(dataset_train)
                    ],
         verbose=True,
         shuffle=False

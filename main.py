@@ -25,24 +25,26 @@ def main():
     else:
         print(f'Удалено старых моделей h5 и zip архивов: {check_garbage_files_count}')
     timer = time.time()
+    train_path = 'train'
+    valid_path = 'valid'
 
     images_train, _, coco_train, classes_train = filterDataset(ann_file_name='labels_my-project-name_2022-11-15-02-32-33.json',
                                                                percent_valid=0,
-                                                               path_folder='train'
+                                                               path_folder=train_path
                                                                )
 
     # return 0
     images_valid, _, coco_valid, classes_valid = filterDataset(ann_file_name='labels_my-project-name_2022-11-15-02-32-33.json',
                                                                percent_valid=0,
-                                                               path_folder='train'
+                                                               path_folder=valid_path
                                                                )
 
     print(f'РАЗМЕР ДАТАСЕТА ДЛЯ ТРЕНИРОВКИ: {len(images_train)}')
-    print(f'РАЗМЕР ДАТАСЕТА ДЛЯ ВАЛИДАЦИИ: {len(images_train)}')
+    print(f'РАЗМЕР ДАТАСЕТА ДЛЯ ВАЛИДАЦИИ: {len(images_valid)}')
 
     print(classes_train)
     input_image_size = (128, 128)
-    batch_size = 4
+    batch_size = 8
     # train_gen = cocoDataGenerator(
     #     images_train,
     #     classes_train,
@@ -63,18 +65,30 @@ def main():
     # )
 
     train_gen = DatasetGeneratorFromCocoJson(batch_size=batch_size, image_list=images_train, coco=coco_train,
-                                             path_folder=os.path.join(DATASET_PATH, 'train'), classes=classes_train,
+                                             path_folder=os.path.join(DATASET_PATH, train_path), classes=classes_train,
                                              aurgment=True, input_image_size=input_image_size)
 
-    val_gen = DatasetGeneratorFromCocoJson(batch_size=batch_size, image_list=images_train, coco=coco_train,
-                                           path_folder=os.path.join(DATASET_PATH, 'train'), classes=classes_train,
+    val_gen = DatasetGeneratorFromCocoJson(batch_size=batch_size, image_list=images_valid, coco=coco_valid,
+                                           path_folder=os.path.join(DATASET_PATH, valid_path), classes=classes_valid,
                                            aurgment=False, input_image_size=input_image_size)
-    # for j in range(10):
-    img, mask = next(train_gen)
+    # for j in range(5):
+    #     img, mask = next(train_gen)
+    #     gen_viz(img_s=img, mask_s=mask, epoch='start train test mask')
+    # return 0
+
+        # print(img.shape)
+
+    # return 0
+
 
     # visualizeGenerator(gen=None, img=img, pred=mask)
     # visualizeGenerator(val_gen)
 
+
+
+    # return 0
+
+    img, mask = val_gen.__getitem__(0)
     gen_viz(img_s=img, mask_s=mask)
 
 
@@ -105,10 +119,11 @@ def main():
     # img1, mask1 = val_gen.__getitem__(0)
     # visualizeImageOrGenerator(images_list=img1, mask_list=mask1)
 
+    # return 0
     # model = unet_plus_plus(input_shape=(input_image_size[0], input_image_size[1], 3), num_classes=len(classes_train))
     model = unet(input_shape=(input_image_size[0], input_image_size[1], 3), num_classes=len(classes_train))
     print(model.summary())
-    # tf.keras.utils.plot_model(model, to_file='model_plot.png', show_shapes=True, show_layer_names=True)
+    tf.keras.utils.plot_model(model, to_file='model_plot.png', show_shapes=True, show_layer_names=True)
 
     # return 0
     path_model = os.path.join(MODEL_H5_PATH, MODEL_H5_FILE_NAME)
@@ -126,11 +141,11 @@ def main():
                           dataset_size_train=len(images_train),
                           dataset_size_val=len(images_valid),
                           model_history=model_history,
-                          monitor='dice_coef',
-                          mode='max'
+                          monitor='loss',
+                          mode='min'
                           )
 
-    plot_segm_history(history, metrics=['my_dice_coef', 'val_dice_coef'])
+    plot_segm_history(history, metrics=['my_mean_iou', 'val_my_mean_iou'])
 
     path_zip = zipfile.ZipFile(f'{os.path.splitext(path_model)[0]}.zip', 'w')
     path_zip.write(path_model, arcname=f'{model_history.name_file}')

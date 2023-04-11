@@ -7,6 +7,7 @@ import numpy as np
 import tensorflow as tf
 from keras.models import Model, load_model
 from matplotlib import gridspec, pyplot as plt
+from segmentation_models.losses import cce_dice_loss
 
 from definitions import ANNOTATION_FILE_PATH, MODEL_H5_PATH, DATASET_PATH
 from utils.CocoGenerator_new import DatasetGeneratorFromCocoJson
@@ -19,9 +20,9 @@ class MyMeanIOU(tf.keras.metrics.MeanIoU):
         return super().update_state(tf.argmax(y_true, axis=-1), tf.argmax(y_pred, axis=-1), sample_weight)
 
 
-def dice_coef(y_true, y_pred, smooth=1):
-    y_true_f = K.flatten(y_true[..., 1:])  # удаляем первый канал, отвечающий за фон
-    y_pred_f = K.flatten(y_pred[..., 1:])
+def dice_coef(y_true, y_pred, smooth=1e-7):
+    y_true_f = K.flatten(y_true)
+    y_pred_f = K.flatten(y_pred)
     intersection = K.sum(y_true_f * y_pred_f)
     return (2. * intersection + smooth) / (K.sum(y_true_f) + K.sum(y_pred_f) + smooth)
 
@@ -97,28 +98,60 @@ colors = np.array([
 
 
 def show_mask_true_and_predict():
-    images_train, images_valid, coco, classes = filterDataset(ann_file_name='labels_my-project-name_2022-11-15-02-32-33.json', percent_valid=0, shuffie=False, path_folder='train')
+    images_train, _, coco_train, classes_train = filterDataset(ann_file_name='labels_my-project-name_2022-11-15-02-32-33.json',
+                                                               percent_valid=0,
+                                                               path_folder='train'
+                                                               )
     paths_m = os.path.join(MODEL_H5_PATH, 'model_1_0_19.h5')
     dddd = MyMeanIOU(num_classes=3)
     model = load_model(paths_m, custom_objects={
-        'iou_coef': iou_coef,
+        'categorical_crossentropy_plus_dice_loss': cce_dice_loss,
         'MyMeanIOU': dddd,
-        'dice_loss': dice_loss,
+        # 'dice_loss': dice_loss,
         # 'jaccard_coef': jaccard_coef
     })
-    train_gen = DatasetGeneratorFromCocoJson(batch_size=4, image_list=images_train, coco=coco,
-                                             path_folder=os.path.join(DATASET_PATH, 'train'), classes=classes, aurgment=True)
+    train_gen = DatasetGeneratorFromCocoJson(batch_size=8, image_list=images_train, coco=coco_train,
+                                             path_folder=os.path.join(DATASET_PATH, 'train'), classes=classes_train, aurgment=True)
     for i in range(1):
         img, mask = train_gen.__getitem__(i)
         pre = model.predict(img)
-        gen_viz(img_s=img, mask_s= mask, pred=pre)
+        gen_viz(img_s=img, mask_s=mask, pred=pre)
 
 
+def visualizeGenerator(gen, img=None, pred=None):
+    import matplotlib as mpl
+    colors = ['#0044ff', '#ff00fb', '#ff0000', '#2bff00', '#474B4E', '#D84B20', '#8F8F8F', '#6D6552', '#4E5754',
+              '#6C4675', '#969992', '#9E9764']
+    # Iterate the generator to get image and mask batches
+    if gen is not None:
+        img1, mask1 = next(gen)
+    else:
+        img1, mask1 = img, pred
+    fig = plt.figure(figsize=(20, 10))
+    outerGrid = gridspec.GridSpec(1, 2, wspace=0.1, hspace=0.1)
 
-def gen_viz(img_s, mask_s, pred = None):
+    for i in range(2):
+        innerGrid = gridspec.GridSpecFromSubplotSpec(2, 2, subplot_spec=outerGrid[i], wspace=0.05, hspace=0.05)
+        for j in range(4):
+            ax = plt.Subplot(fig, innerGrid[j])
+            if (i == 1):
+                ax.imshow(img1[j])
+            else:
+                # print(mask.shape)
+                for m in range(len(mask1[0, 0, 0, :])):
+                    mask_one = mask1[j, :, :, m]
+                    if pred is not None:
+                        mask_one = mask1[j, :, :, m] > 0.85
+                    ax.imshow(mask_one, alpha=0.5)
+            ax.axis('off')
+            fig.add_subplot(ax)
+    plt.show()
+
+def gen_viz(img_s, mask_s, pred = None, epoch = None):
     # print(img_s.shape)
     # print(mask_s.shape)
     fig = plt.figure(figsize=(10, 25))
+    fig.suptitle(f'epoch: {str(epoch)}', fontsize=26, fontweight='bold')
     gs = gridspec.GridSpec(nrows=len(img_s), ncols=3)
     colors = ['yellow', 'green', 'red']
     labels = ["Small Bowel", "Large Bowel", "Stomach"]
@@ -129,17 +162,17 @@ def gen_viz(img_s, mask_s, pred = None):
     cmap2 = mpl.colors.ListedColormap(colors[1])
     cmap3 = mpl.colors.ListedColormap(colors[2])
     flag = False
-    for i in range(0, 4):
+    for i in range(0, 8):
 
         images, mask = img_s[i], mask_s[i]
-        sample_img = images / 255.
+        sample_img = images
         # print(mask.shape)
         mask1 = mask[:, :, 0]
         mask2 = mask[:, :, 1]
         mask3 = mask[:, :, 2]
 
         ax0 = fig.add_subplot(gs[i, 0])
-        im = ax0.imshow(sample_img[:, :, 0], cmap='gray')
+        im = ax0.imshow(sample_img)
         ax1 = fig.add_subplot(gs[i, 1])
         ax2 = fig.add_subplot(gs[i, 2])
         if (flag == False):
@@ -152,7 +185,7 @@ def gen_viz(img_s, mask_s, pred = None):
             plt.legend(handles=patches, bbox_to_anchor=(1.1, 0.65), loc=2, borderaxespad=0.4, fontsize=14,
                        title='Mask Labels', title_fontsize=14, edgecolor="black", facecolor='#c5c6c7')
 
-        l0 = ax1.imshow(sample_img[:, :, 0], cmap='gray')
+        l0 = ax1.imshow(sample_img)
         l1 = ax1.imshow(np.ma.masked_where(
             mask1 == False, mask1), cmap=cmap1, alpha=1)
         l2 = ax1.imshow(np.ma.masked_where(
@@ -172,13 +205,13 @@ def gen_viz(img_s, mask_s, pred = None):
             predict3 = pre[:, :, 2] > 0.7
             predict3 = (predict3).astype(np.float32)
             predict3 = np.array(predict3)
-            l0 = ax2.imshow(sample_img[:, :, 0], cmap='gray')
+            l0 = ax2.imshow(sample_img)
             l1 = ax2.imshow(np.ma.masked_where(
-                predict1 == False, predict1), cmap=cmap1, alpha=1)
+                predict1 == False, predict1), cmap=cmap1, alpha=0.8)
             l2 = ax2.imshow(np.ma.masked_where(
-                predict2 == False, predict2), cmap=cmap2, alpha=1)
+                predict2 == False, predict2), cmap=cmap2, alpha=0.8)
             l3 = ax2.imshow(np.ma.masked_where(
-                predict3 == False, predict3), cmap=cmap3, alpha=1)
+                predict3 == False, predict3), cmap=cmap3, alpha=0.8)
             _ = [ax.set_axis_off() for ax in [ax0, ax1]]
 
         colors = [im.cmap(im.norm(1)) for im in [l1, l2, l3]]
