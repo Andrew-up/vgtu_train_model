@@ -271,7 +271,10 @@ class DatasetGeneratorFromCocoJson(tf.keras.utils.Sequence):
         self.c += 1
 
         img = np.array(X).astype(np.float32)
+        img[img == 0.] = 1
+        #     print('null')
         mask = np.array(y).astype(np.float32)
         mask_one_hot = tf.keras.utils.to_categorical(mask, num_classes=len(self.classes) + 1)
         mask_one_hot = mask_one_hot[:, :, :, 1:]
+
         return img, mask_one_hot

@@ -27,8 +27,12 @@ class PrintTrueAndPred(tf.keras.callbacks.Callback):
         # sssssssp = y_pred[0]
         # if epoch//5 == 0:
         #     print(epoch)
+
+        visualizeGenerator(gen=None, img=img, pred=y_pred)
         gen_viz(img_s=img, mask_s=mask_original, pred=y_pred, epoch=f"{epoch}. iou: {round(logs['my_mean_iou'], 3)}")
-        # visualizeGenerator(gen=None, img=img, pred=y_pred)
+
+        # gen_viz(img_s=img, mask_s=mask_original, pred=y_pred, epoch=f"{epoch}")
+
         # mask = y_pred
         # labels = ['class 1', 'class 2', 'class 3']
         # fig1, axs1 = plt.subplots(nrows=len(mask[:, 0, 0, 0]), ncols=4, figsize=(8, 8))
@@ -74,7 +78,7 @@ def train_model(model: Sequential,
     checkpoint2 = callback.checkpoint2()
     print_test = callback.print_test()
     early_stop_train = callback.early_stopping()
-    steps_per_epoch = math.floor(dataset_size_train // batch_size) * 3
+    steps_per_epoch = math.floor(dataset_size_train // batch_size)
     validation_steps = math.floor((dataset_size_val // batch_size))
 
     history = model.fit(

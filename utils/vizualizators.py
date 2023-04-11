@@ -1,4 +1,5 @@
 import os.path
+from enum import Enum
 
 import keras.backend as K
 import matplotlib as mpl
@@ -147,6 +148,50 @@ def visualizeGenerator(gen, img=None, pred=None):
             fig.add_subplot(ax)
     plt.show()
 
+
+# mask color codes
+class MaskColorMap(Enum):
+    Unlabelled = (0, 0, 0)
+    Building = (60, 16, 152)
+    Land = (132, 41, 246)
+    Road = (110, 193, 228)
+    Vegetation = (254, 221, 58)
+    Water = (226, 169, 41)
+
+def display_images(instances, rows=2, titles=None):
+    """
+    :param instances:  list of images
+    :param rows: number of rows in subplot
+    :param titles: subplot titles
+    :return:
+    """
+    n = len(instances)
+    cols = n // rows if (n / rows) % rows == 0 else (n // rows) + 1
+
+    # iterate through images and display subplots
+    for j, image in enumerate(instances):
+        plt.subplot(rows, cols, j + 1)
+        plt.title('') if titles is None else plt.title(titles[j])
+        plt.axis("off")
+        plt.imshow(image)
+
+    # show the figure
+    plt.show()
+
+def rgb_encode_mask(mask):
+
+    # initialize rgb image with equal spatial resolution
+    rgb_encode_image = np.zeros((mask.shape[0], mask.shape[1], 3))
+
+    # iterate over MaskColorMap
+    for j, cls in enumerate(MaskColorMap):
+        # convert single integer channel to RGB channels
+        rgb_encode_image[(mask == j)] = np.array(cls.value) / 255.
+
+    # plt.show(rgb_encode_image)
+
+    return rgb_encode_image
+
 def gen_viz(img_s, mask_s, pred = None, epoch = None):
     # print(img_s.shape)
     # print(mask_s.shape)
@@ -164,7 +209,10 @@ def gen_viz(img_s, mask_s, pred = None, epoch = None):
     flag = False
     for i in range(0, 8):
 
+
         images, mask = img_s[i], mask_s[i]
+        # mask_one_hot = tf.keras.utils.to_categorical(mask, num_classes=4)
+        # mask = mask_one_hot[:, :, 1:]
         sample_img = images
         # print(mask.shape)
         mask1 = mask[:, :, 0]
@@ -196,13 +244,13 @@ def gen_viz(img_s, mask_s, pred = None, epoch = None):
         if pred is not None:
 
             pre = pred[i]
-            predict1 = pre[:, :, 0] > 0.7
+            predict1 = pre[:, :, 0] > 0.5
             predict1 = (predict1).astype(np.float32)
             predict1 = np.array(predict1)
-            predict2 = pre[:, :, 1] > 0.7
+            predict2 = pre[:, :, 1] > 0.5
             predict2 = (predict2).astype(np.float32)
             predict2 = np.array(predict2)
-            predict3 = pre[:, :, 2] > 0.7
+            predict3 = pre[:, :, 2] > 0.5
             predict3 = (predict3).astype(np.float32)
             predict3 = np.array(predict3)
             l0 = ax2.imshow(sample_img)
