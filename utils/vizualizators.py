@@ -28,6 +28,45 @@ def dice_coef(y_true, y_pred, smooth=1e-7):
     return (2. * intersection + smooth) / (K.sum(y_true_f) + K.sum(y_pred_f) + smooth)
 
 
+def create_mask(pred_mask):
+    pred_mask = np.argmax(pred_mask, axis=-1)
+    pred_mask = pred_mask[..., tf.newaxis]
+    return pred_mask
+
+def display(img=None, mask=None, pred=None):
+    size = 0
+    if img is not None:
+        size += 1
+    if mask is not None:
+        size += 1
+    if pred is not None:
+        size += 1
+    plt.figure(figsize=(10, 10))
+    title = ['image original', 'original Mask', 'predicted_mask']
+    # print(len(display_list[0][:, 0, 0, 0]))
+    fig, axs = plt.subplots(nrows=len(img),
+                            ncols=size,
+                            figsize=(5, 5))
+    axs[0][0].set_title(title[0])
+    axs[0][1].set_title(title[1])
+    if pred is not None:
+        axs[0][2].set_title(title[2])
+    for j in range(len(img)):
+        for i in range(size):
+            axs[j][i].axis('off')
+            image = np.zeros((128, 128), dtype=np.uint8)
+            if i == 0:
+                image = tf.keras.preprocessing.image.array_to_img(img[j])
+            if i == 1:
+                mask_one = create_mask(mask[j] > 0.7)
+                image = tf.keras.preprocessing.image.array_to_img(mask_one)
+            if i == 2:
+                pred_one = create_mask(pred[j] > 0.2)
+                image = tf.keras.preprocessing.image.array_to_img(pred_one)
+            axs[j][i].imshow(image)
+    plt.show()
+
+
 def viz_model():
     images_train, images_valid, coco, classes = filterDataset(ANNOTATION_FILE_PATH, percent_valid=0, shuffie=False)
     paths_m = os.path.join(MODEL_H5_PATH, 'model_1_0_20.h5')
@@ -206,13 +245,26 @@ def gen_viz(img_s, mask_s, pred = None, epoch = None):
     cmap1 = mpl.colors.ListedColormap(colors[0])
     cmap2 = mpl.colors.ListedColormap(colors[1])
     cmap3 = mpl.colors.ListedColormap(colors[2])
+
+    mask_s = mask_s[:, :, :, 1:]
+    if pred is not None:
+        pred = pred[:, :, :, 1:]
+    # if pred is not None:
+    #     mask_one_hot = tf.keras.utils.to_categorical(pred, num_classes=4)
+    #     mask_one_hot = mask_one_hot[:, :, :, 1:]
+    #     pred = mask_one_hot
+
+    # if mask_s is not None:
+    #     mask_one_hot2 = tf.keras.utils.to_categorical(mask_s, num_classes=4)
+    #     mask_one_hot2 = mask_one_hot2[:, :, :, 1:]
+    #     mask_s = mask_one_hot2
+    if pred is not None:
+        print(f'pred shape:{pred.shape}')
     flag = False
     for i in range(0, 8):
 
 
         images, mask = img_s[i], mask_s[i]
-        # mask_one_hot = tf.keras.utils.to_categorical(mask, num_classes=4)
-        # mask = mask_one_hot[:, :, 1:]
         sample_img = images
         # print(mask.shape)
         mask1 = mask[:, :, 0]

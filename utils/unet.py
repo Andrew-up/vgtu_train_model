@@ -1,22 +1,13 @@
-from typing import Union, Callable
-
-import keras
+import keras.losses
 import numpy as np
 import tensorflow as tf
-from keras import layers, Input, Model
-
-import keras.backend as K
-from keras.backend import epsilon
-from keras.layers import Conv2D, BatchNormalization, Activation, Conv2DTranspose, MaxPooling2D, concatenate, Dropout, \
-    Lambda, Concatenate, UpSampling2D
-from keras.losses import binary_crossentropy
-from keras.optimizers import Adam
+from keras import Input
+from keras.layers import Conv2D, Conv2DTranspose, concatenate, MaxPooling2D, Dropout
 from keras_unet.models import custom_unet
-from segmentation_models.losses import dice_loss, jaccard_loss, cce_dice_loss
+from segmentation_models.losses import cce_dice_loss
 
-from utils.loss_functions import Semantic_loss_functions
-# from utils.model_losses import dice_loss, dice_coef
-from utils.model_optimizers import SGD_loss, Adam_opt
+from utils.model_optimizers import Adam_opt
+
 
 class MyMeanIOU(tf.keras.metrics.MeanIoU):
     def update_state(self, y_true, y_pred, sample_weight=None):
@@ -25,63 +16,94 @@ class MyMeanIOU(tf.keras.metrics.MeanIoU):
         return super().update_state(tf.argmax(y_true, axis=-1), tf.argmax(y_pred, axis=-1), sample_weight)
 
 
-def dice_loss_new(y_true, y_pred):
+def conv_block(inputs=None, n_filters=32, dropout_prob=0.0, max_pooling=True):
+    conv = Conv2D(n_filters,  # Number of filters
+                  3,  # Kernel size
+                  activation='relu',
+                  padding='same',
+                  kernel_initializer='HeNormal')(inputs)
+    conv = Conv2D(n_filters,
+                  3,
+                  activation='relu',
+                  padding='same',
+                  kernel_initializer='HeNormal')(conv)
+    if dropout_prob > 0:
+        conv = Dropout(rate=dropout_prob)(conv)
 
-    smooth = 1e-7
-    dice = 0
-    num_classes = 3
-    for i in range(num_classes):
-        y_true_i = y_true[:, :, :, i]
-        y_pred_i = y_pred[:, :, :, i]
-        intersection = K.sum(y_true_i * y_pred_i)
-        union = K.sum(y_true_i) + K.sum(y_pred_i)
-        dice_i = (2. * intersection + smooth) / (union + smooth)
-        dice += dice_i
+    if max_pooling:
+        next_layer = MaxPooling2D(2, 2)(conv)
 
-    return 1 - dice / num_classes
+    else:
+        next_layer = conv
+
+    skip_connection = conv
+
+    return next_layer, skip_connection
 
 
-def jaccard_index(y_true, y_pred):
-    y_true_f = K.flatten(y_true)
-    y_pred_f = K.flatten(y_pred)
-    intersection = K.sum(y_true_f * y_pred_f)
-    return (intersection + 1.0) / (K.sum(y_true_f) + K.sum(y_pred_f) - intersection + 1.0)
+def upsampling_block(expansive_input, contractive_input, n_filters=32):
+    up = Conv2DTranspose(
+        n_filters,  # number of filters
+        3,  # Kernel size
+        strides=2,
+        padding='same')(expansive_input)
 
-def build_unet(num_classes=None, input_shape=(128, 128, 3)):
-    # input layer shape is equal to patch image size
-    inputs = Input(shape=input_shape)
+    # Merge the previous output and the contractive_input
+    merge = concatenate([up, contractive_input], axis=3)
+    conv = Conv2D(n_filters,
+                  3,
+                  activation='relu',
+                  padding='same',
+                  kernel_initializer='HeNormal')(merge)
+    conv = Conv2D(n_filters,
+                  3,
+                  activation='relu',
+                  padding='same',
+                  kernel_initializer='HeNormal')(conv)
 
-    # rescale images from (0, 255) to (0, 1)
-    previous_block_activation = inputs  # Set aside residual
+    return conv
 
-    contraction = {}
-    # # Contraction path: Blocks 1 through 5 are identical apart from the feature depth
-    for f in [16, 32, 64, 128, 256]:
-        x = Conv2D(f, (3, 3), activation='relu', kernel_initializer='he_normal', padding='same')(previous_block_activation)
-        x = Dropout(0.1)(x)
-        x = Conv2D(f, (3, 3), activation='relu', kernel_initializer='he_normal', padding='same')(x)
-        # x = BatchNormalization()(x)
-        contraction[f'conv{f}'] = x
-        x = MaxPooling2D((2, 2))(x)
-        previous_block_activation = x
+class DiceLoss(tf.keras.losses.Loss):
+    def __init__(self, smooth=1e-6, gama=2):
+        super(DiceLoss, self).__init__()
+        self.name = 'NDL'
+        self.smooth = smooth
+        self.gama = gama
 
-    c5 = Conv2D(160, (3, 3), activation='relu', kernel_initializer='he_normal', padding='same')(previous_block_activation)
-    c5 = Dropout(0.2)(c5)
-    c5 = Conv2D(160, (3, 3), activation='relu', kernel_initializer='he_normal', padding='same')(c5)
-    previous_block_activation = c5
+    def call(self, y_true, y_pred):
+        y_true, y_pred = tf.cast(
+            y_true, dtype=tf.float32), tf.cast(y_pred, tf.float32)
+        nominator = 2 * \
+            tf.reduce_sum(tf.multiply(y_pred, y_true)) + self.smooth
+        denominator = tf.reduce_sum(
+            y_pred ** self.gama) + tf.reduce_sum(y_true ** self.gama) + self.smooth
+        result = 1 - tf.divide(nominator, denominator)
+        return result
 
-    # Expansive path: Second half of the network: upsampling inputs
-    for f in reversed([16, 32, 64, 128, 256]):
-        x = Conv2DTranspose(f, (2, 2), strides=(2, 2), padding='same')(previous_block_activation)
-        x = concatenate([x, contraction[f'conv{f}']])
-        x = Conv2D(f, (3, 3), activation='relu', kernel_initializer='he_normal', padding='same')(x)
-        # x = BatchNormalization()(x)
-        x = Dropout(0.2)(x)
-        x = Conv2D(f, (3, 3), activation='relu', kernel_initializer='he_normal', padding='same')(x)
-        previous_block_activation = x
+def unet_model(input_size=(224, 224, 3), n_filters=32, n_classes=3):
+    inputs = Input(input_size)
+    cblock1 = conv_block(inputs, n_filters)
+    cblock2 = conv_block(cblock1[0], n_filters * 2)
+    cblock3 = conv_block(cblock2[0], n_filters * 4)
+    cblock4 = conv_block(cblock3[0], n_filters * 8, dropout_prob=0.3)
+    cblock5 = conv_block(cblock4[0], n_filters * 16, dropout_prob=0.3, max_pooling=False)
 
-    outputs = Conv2D(filters=num_classes, kernel_size=(1, 1), activation="softmax")(previous_block_activation)
-    return Model(inputs=inputs, outputs=outputs)
+    ublock6 = upsampling_block(cblock5[0], cblock4[1], n_filters * 8)
+    ublock7 = upsampling_block(ublock6, cblock3[1], n_filters * 4)
+    ublock8 = upsampling_block(ublock7, cblock2[1], n_filters * 2)
+    ublock9 = upsampling_block(ublock8, cblock1[1], n_filters)
+
+    conv9 = Conv2D(n_filters,
+                   3,
+                   activation='relu',
+                   padding='same',
+                   kernel_initializer='he_normal')(ublock9)
+    conv10 = Conv2D(n_classes, 1, padding='same', activation='softmax')(conv9)
+
+    model = tf.keras.Model(inputs=inputs, outputs=conv10)
+    iou = MyMeanIOU(num_classes=n_classes)
+    model.compile(optimizer='adam', loss=cce_dice_loss, metrics=[iou, 'accuracy'])
+    return model
 
 def unet(num_classes=None, input_shape=(128, 128, 3)):
     model = custom_unet(
@@ -90,12 +112,11 @@ def unet(num_classes=None, input_shape=(128, 128, 3)):
         num_classes=num_classes,
         filters=16,
         num_layers=6,
-        dropout=0.2,
+        # dropout=0.2,
         activation="relu",
         output_activation='softmax',
     )
 
     iou = MyMeanIOU(num_classes=num_classes)
-    model.compile(optimizer=Adam_opt(), loss=cce_dice_loss, metrics=[iou, 'accuracy'])
+    model.compile(optimizer=Adam_opt(), loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True), metrics=['accuracy'])
     return model
-
