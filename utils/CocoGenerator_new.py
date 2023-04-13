@@ -115,16 +115,13 @@ class DatasetGeneratorFromCocoJson(tf.keras.utils.Sequence):
         cats = self.coco.loadCats(catIds)
         train_mask = np.zeros(self.input_image_size)
         for a in range(len(anns)):
-            # train_mask1111 = np.zeros((512, 512))
             className = self.getClassName(anns[a]['category_id'], cats)
             pixel_value = self.classes.index(className) + 1
-
             new_mask = cv2.resize(self.coco.annToMask(
                 anns[a]) * pixel_value, self.input_image_size)
             train_mask = np.maximum(new_mask, train_mask)
 
-        # train_mask = train_mask[:, :, np.newaxis]
-        train_mask = train_mask.reshape((self.input_image_size[0], self.input_image_size[1], 1))
+        train_mask = train_mask[:, :, np.newaxis]
         return train_mask
 
     def gasuss_noise(self, image, koef):

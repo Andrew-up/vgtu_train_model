@@ -15,41 +15,15 @@ import keras.backend as K
 from utils.vizualizators import gen_viz, visualizeGenerator, display, create_mask
 
 
-class PrintTrueAndPred(tf.keras.callbacks.Callback):
+class ShowPredict(tf.keras.callbacks.Callback):
     def __init__(self, generator):
         super().__init__()
         self.generator = generator
 
     def on_epoch_end(self, epoch, logs=None):
         img, mask_original = next(self.generator)
-
         y_pred = self.model.predict(img, verbose=1)
-
-        # sssssssp = y_pred[0]
-        # if epoch//5 == 0:
-        #     print(epoch)
         display(img, mask_original, y_pred)
-        # visualizeGenerator(gen=None, img=img, pred=y_pred)
-        gen_viz(img_s=img, mask_s=mask_original, pred=y_pred, epoch=f"{epoch}. iou: {round(logs['my_mean_iou'], 3)}")
-
-        # gen_viz(img_s=img, mask_s=mask_original, pred=y_pred, epoch=f"{epoch}")
-
-        # mask = y_pred
-        # labels = ['class 1', 'class 2', 'class 3']
-        # fig1, axs1 = plt.subplots(nrows=len(mask[:, 0, 0, 0]), ncols=4, figsize=(8, 8))
-        # fig1.suptitle(f'epoch: {epoch}', fontsize=20, fontweight='bold')
-        # fig1.tight_layout()
-        # axs1[0][3].set_title(f'Оригинальное фото')
-        # for ssss in range(mask.shape[-1]):
-        #     axs1[0][ssss].set_title(f'{labels[ssss]}')
-        #
-        # for i in range(mask.shape[0]):
-        #     axs1[i][3].imshow(img[i, :, :, :])
-        #     axs1[i][3].axis('off')
-        #     for j in range(mask.shape[-1]):
-        #         axs1[i][j].imshow(mask[i, :, :, j] > 0.8)
-        #         axs1[i][j].axis('off')
-        # plt.show()
 
 
 
@@ -90,7 +64,7 @@ def train_model(model: Sequential,
         epochs=n_epoch,
         callbacks=[tb_callback, reduce_lr, checkpoint,
                    checkpoint2,
-                   PrintTrueAndPred(dataset_train)
+                   ShowPredict(dataset_train)
                    ],
         verbose=True,
         # shuffle=False

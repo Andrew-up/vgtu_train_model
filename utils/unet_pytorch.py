@@ -1,7 +1,6 @@
 import torch
 from torch import nn
 import torchvision.transforms.functional as F
-
 class DoubleConv(nn.Module):
     """(convolution => [BN] => ReLU) * 2"""
 
@@ -72,7 +71,6 @@ class OutConv(nn.Module):
 
     def forward(self, x):
         return self.conv(x)
-
 
 class UNet(nn.Module):
     def __init__(self, n_channels, n_classes, bilinear=False):
