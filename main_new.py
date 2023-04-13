@@ -32,45 +32,53 @@ device = torch.device('cuda')
 
 
 def train(train_loader, model, optimizer, data_size):
-    running_loss = 0.0
-    data_size = data_size
+      running_loss = 0.0
+      # data_size = len(train_data)
 
-    model.train()
-    predicts = []
-    truths = []
+      model.train()
+      predicts = []
+      truths = []
 
-    for inputs, masks in tqdm(train_loader):
+      for inputs, masks in tqdm(train_loader):
+        #print(inputs.shape)
+        #print(masks.shape)
         inputs, masks = inputs.to(device), masks.to(device)
         optimizer.zero_grad()
 
         with torch.set_grad_enabled(True):
-            inputs = inputs.float()
-            masks = masks.float()
-            logit = model(inputs)
-            criterion = nn.CrossEntropyLoss()
-            loss = criterion(logit, masks)
-            loss.backward()
-            optimizer.step()
+          inputs = inputs.float()
+          masks = masks
+          masks = masks.squeeze()
+          logit = model(inputs)
+          criterion = nn.CrossEntropyLoss(weight=torch.Tensor([0.3, 1.0, 1, 1]).to(device))
+          loss = criterion(logit, masks)
+          loss.backward()
+          optimizer.step()
 
         predicts.append(torch.softmax(logit, dim=0).detach().cpu().numpy())
         truths.append(masks.detach().cpu().numpy())
 
-        # predicts = np.concatenate(predicts).squeeze()
-        # truths = np.concatenate(truths).squeeze()
+        #predicts = np.concatenate(predicts).squeeze()
+        #truths = np.concatenate(truths).squeeze()
 
         running_loss += loss.item() * inputs.size(0)
 
-    predicts = np.concatenate(predicts).squeeze()
-    truths = np.concatenate(truths).squeeze()
+      predicts = np.concatenate(predicts).squeeze()
+      truths = np.concatenate(truths).squeeze()
 
-    jaccard = JaccardIndex(num_classes=4, task="multiclass")
-    iou = jaccard(torch.tensor(predicts), torch.tensor(truths))
+      jaccard = JaccardIndex(num_classes=4, task="multiclass")
 
-    epoch_loss = running_loss / data_size
-    return epoch_loss, iou
+      iou = jaccard(torch.tensor(predicts), torch.tensor(truths))
+      epoch_loss = running_loss / data_size
+      return epoch_loss, iou
 
 
 def main():
+    print(torch.version)
+    print(torch.cuda.is_available())
+
+    print(torch.version.cuda)
+
     save_weight = 'weights/'
     if not os.path.isdir(save_weight):
         os.mkdir(save_weight)
@@ -106,7 +114,8 @@ def main():
     print(unet)
     unet.to(device)
     scheduler_step = 100
-    optimizer = torch.optim.SGD(unet.parameters(), lr=max_lr, momentum=momentum, weight_decay=weight_decay)
+    optimizer = torch.optim.AdamW(unet.parameters())
+    # optimizer = torch.optim.SGD(unet.parameters(), lr=max_lr, momentum=momentum, weight_decay=weight_decay)
     lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, scheduler_step, min_lr)
 
     BATCH_SIZE = 4
@@ -119,6 +128,7 @@ def main():
         num_workers=1,
         pin_memory=True,
     )
+
     best_param = None
     data_size = int(train_data.__len__())
     num_snapshot = 0
@@ -134,6 +144,8 @@ def main():
 
         if epoch_ == epoch - 1:
             torch.save(best_param, save_weight + weight_name + str(num_snapshot) + '.pth')
+
+
 
         print('epoch: {} train_loss: {:.3f} iou: {:.3f}'.format(epoch_ + 1, train_loss, iou))
 
@@ -167,19 +179,12 @@ class ImageData(Dataset):
                         img2: torch.Tensor
                         ) -> tuple[torch.Tensor, torch.Tensor]:
         params = tf.RandomResizedCrop.get_params(img1, scale=[0.5, 1.0], ratio=[0.75, 1.33])
-
-        # gr2rgb = tf.Lambda(lambda x: x.repeat(3, 1, 1))
-        # img2 = gr2rgb(img2)
-
-        Hhhh = np.array(img2)
-
-
         img1 = tf.functional.resized_crop(img1, *params, size=self.input_image_size, antialias=True)
         img2 = tf.functional.resized_crop(img2, *params, size=self.input_image_size, antialias=True)
 
         return img1, img2
 
-    def __getitem__(self, i: int) -> tuple[torch.Tensor, torch.LongTensor]:
+    def __getitem__(self, i: int) -> tuple[torch.Tensor, torch.Tensor]:
         ann_ids = self.annotations.getAnnIds(
             imgIds=self.img_data[i]['id'],
             catIds=self.cat_ids,
@@ -192,6 +197,7 @@ class ImageData(Dataset):
 
         img = torchvision.transforms.Resize(self.input_image_size, antialias=True)(img)
         mask = torchvision.transforms.Resize(self.input_image_size, antialias=True)(mask)
+
 
         if img.shape[0] == 1:
             img = torch.cat([img] * 3)
