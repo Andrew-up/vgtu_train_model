@@ -1,22 +1,15 @@
-import matplotlib.pyplot as plt
 import numpy as np
+import torch
+a = np.array([[0.5, 6, 0.1, 3, 0.4, 2, 3, 4],
+              [0.5, 6, 0.1, 3, 0.4, 2, 3, 4]])
 
-# full_np = np.zeros((5, 5, 1)).astype(np.uint8)
-# a = np.zeros((5, 5, 1)).astype(np.uint8)
-#
-# print(full_np.shape)
-#
-#
-#
-#
-#
-# plt.imshow(a)
-# plt.show()
+a[a < 0.5] = 0
+print(a)
+# [[0.5 6.  0.  3.  0.  2.  3.  4. ]
+#  [0.5 6.  0.  3.  0.  2.  3.  4. ]]
 
-def gen_test():
-    for i in [2,3,4,5,6]:
-        yield i
 
-print(next(gen_test()))
-print(next(gen_test()))
-print(next(gen_test()))
+h = torch.tensor(0.4444)
+
+print(round(h.item(), 3))
+# print(range(h.values(), 3))
