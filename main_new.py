@@ -1,4 +1,5 @@
 import os
+import random
 from pathlib import Path
 
 import numpy as np
@@ -7,7 +8,7 @@ import torch.nn as nn
 import torchvision
 import torchvision.io as io
 import torchvision.transforms as tf
-import torchvision.transforms.functional as F
+import torchvision.transforms.functional as functional
 from matplotlib import pyplot as plt
 from pycocotools.coco import COCO
 from torch.utils.data import Dataset, DataLoader
@@ -17,6 +18,8 @@ from tqdm import tqdm
 from definitions import DATASET_PATH
 from utils.get_dataset_coco import filterDataset
 from utils.unet_pytorch import UNet
+import torchvision.transforms as T
+import torch.nn.functional as F
 
 n_fold = 5
 pad_left = 27
@@ -32,7 +35,6 @@ weight_decay = 1e-4
 # n_fold = 5
 device = torch.device('cuda')
 
-
 def train(train_loader, model, optimizer, data_size):
     running_loss = 0.0
     # data_size = len(train_data)
@@ -47,11 +49,11 @@ def train(train_loader, model, optimizer, data_size):
         optimizer.zero_grad()
 
         with torch.set_grad_enabled(True):
-            inputs = inputs.float() / 255.
-            masks = masks
+            inputs = inputs.float()
+            masks = masks - 1
             masks = masks.squeeze().long()
             logit = model(inputs)
-            criterion = nn.CrossEntropyLoss(weight=torch.Tensor([0.3, 1.0, 1.0, 1.0]).to(device))
+            criterion = nn.CrossEntropyLoss(ignore_index=-1).to(device)
             loss = criterion(logit, masks)
             loss.backward()
             optimizer.step()
@@ -67,7 +69,7 @@ def train(train_loader, model, optimizer, data_size):
     predicts = np.concatenate(predicts).squeeze()
     truths = np.concatenate(truths).squeeze()
 
-    jaccard = JaccardIndex(num_classes=4, task="multiclass")
+    jaccard = JaccardIndex(num_classes=3, task="multiclass", ignore_index=-1)
 
     iou = jaccard(torch.tensor(predicts), torch.tensor(truths))
     epoch_loss = running_loss / data_size
@@ -106,11 +108,11 @@ def main():
         os.mkdir(save_weight)
     weight_name = 'model_' + str(fine_size + pad_left + pad_right) + '_res18'
 
-    ann_file_name = 'labels_my-project-name_2022-11-15-02-32-33.json'
+    ann_file_name = '_annotations.coco.json'
     # annFile = DATASET_PATH + 'train' + '/' + ann_file_name
     # print(annFile)
     # train_annotations = COCO(annFile)
-    train_path = 'train'
+    train_path = 'train_n/'
     images_train, _, coco_train, classes_train = filterDataset(ann_file_name=ann_file_name,
                                                                percent_valid=0,
                                                                path_folder=train_path,
@@ -120,7 +122,7 @@ def main():
 
     print(f"Number of training images: {len(images_train)}")
 
-    path_dataset = os.path.join(DATASET_PATH, 'train/')
+    path_dataset = os.path.join(DATASET_PATH, train_path)
 
 
     train_data = ImageData(annotations=coco_train,
@@ -141,13 +143,21 @@ def main():
         num_workers=4,
         pin_memory=True,
     )
+    # for j in range(1):
+    img_list, mask_list = next(iter(train_dl))
+    display(img_list=img_list,
+            mask_list=mask_list,
+            # mask_pred_list=outputs123213,
+            # epoch=f'{epoch_ + 1} loss: {round(train_loss, 3)}',
+            # iou=round(iou.item(), 3)
+            )
 
 
-    unet = UNet(n_channels=3, n_classes=4)
+    unet = UNet(n_channels=3, n_classes=3)
     unet.to(device)
     scheduler_step = 100
-    optimizer = torch.optim.AdamW(unet.parameters())
-    # optimizer = torch.optim.SGD(unet.parameters(), lr=max_lr, momentum=momentum, weight_decay=weight_decay)
+    # optimizer = torch.optim.AdamW(unet.parameters())
+    optimizer = torch.optim.SGD(unet.parameters(), lr=max_lr, momentum=momentum, weight_decay=weight_decay)
     lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, scheduler_step, min_lr)
 
     best_param = None
@@ -168,7 +178,7 @@ def main():
 
         img_list, mask_list = next(iter(train_dl))
         # img_list =
-        outputs = unet((img_list.to(device).float() / 255).reshape(4, 3, 128, 128))
+        outputs = unet((img_list.to(device).float()).reshape(4, 3, 128, 128))
 
         mask_pred = torch.softmax(outputs.squeeze(), dim=0)
         # outputs = outputs.cpu().data.numpy()
@@ -205,12 +215,14 @@ def display(img_list, mask_list, mask_pred_list=None, epoch=None, iou=None):
     ax[0][2].set_title('пред. маска')
 
     for j in range(n_row):
-        ax[j][0].imshow(tensor2numpy(img_list[j]))
+        img = img_list[j]
+        ax[j][0].imshow(tensor2numpy(img))
         ax[j][0].axis('off')
         ax[j][1].imshow(colorize_mask(tensor2numpy(mask_list[j])))
         ax[j][1].axis('off')
         if mask_pred_list is not None:
             mask_pred = mask_pred_list[j]
+            # mask_pred = mask_pred + 1
             mask_pred[mask_pred < 0.6] = 0
             pred_mask_arg_masx = np.argmax(mask_pred, axis=0)
             # print(f'max: {pred_mask_arg_masx.max()}')
@@ -248,9 +260,21 @@ class ImageData(Dataset):
                         img1: torch.Tensor,
                         img2: torch.Tensor
                         ) -> tuple[torch.Tensor, torch.Tensor]:
-        params = tf.RandomResizedCrop.get_params(img1, scale=[0.5, 1.0], ratio=[0.75, 1.33])
-        img1 = tf.functional.resized_crop(img1, *params, size=self.input_image_size, antialias=True)
-        img2 = tf.functional.resized_crop(img2, *params, size=self.input_image_size, antialias=True)
+        # if random.random() > 0.5:
+        #     params = tf.RandomResizedCrop.get_params(img1, scale=[0.5, 1.0], ratio=[0.75, 1.33])
+        #     img1 = tf.functional.resized_crop(img1, *params, size=self.input_image_size, antialias=True)
+        #     img2 = tf.functional.resized_crop(img2, *params, size=self.input_image_size, antialias=True)
+
+        if random.random() > 0.5:
+            img1 = tf.functional.hflip(img1)
+            img2 = tf.functional.hflip(img2)
+
+        autocontraster = T.RandomAutocontrast()
+        img1 = autocontraster(img1)
+        if random.random() > 0.5:
+            img1 = tf.functional.vflip(img1)
+            img2 = tf.functional.vflip(img2)
+
 
         return img1, img2
 
@@ -268,6 +292,7 @@ class ImageData(Dataset):
 
         img = torchvision.transforms.Resize(self.input_image_size, antialias=True)(img)
         mask = torchvision.transforms.Resize(self.input_image_size, antialias=True)(mask)
+
 
         if img.shape[0] == 1:
             img = torch.cat([img] * 3)

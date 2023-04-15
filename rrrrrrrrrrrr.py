@@ -1,3 +1,5 @@
+import random
+
 import numpy as np
 import torch
 a = np.array([[0.5, 6, 0.1, 3, 0.4, 2, 3, 4],
