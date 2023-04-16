@@ -17,7 +17,7 @@ from tqdm import tqdm
 
 from definitions import DATASET_PATH
 from utils.get_dataset_coco import filterDataset
-from utils.unet_pytorch import UNet
+from utils.unet_pytorch import UNet, UNet3Plus
 import torchvision.transforms as T
 import torch.nn.functional as F
 
@@ -35,6 +35,7 @@ weight_decay = 1e-4
 # n_fold = 5
 device = torch.device('cuda')
 
+
 def train(train_loader, model, optimizer, data_size):
     running_loss = 0.0
     # data_size = len(train_data)
@@ -50,26 +51,24 @@ def train(train_loader, model, optimizer, data_size):
 
         with torch.set_grad_enabled(True):
             inputs = inputs.float()
-            masks = masks - 1
-            masks = masks.squeeze().long()
+            masks = masks
+            masks = masks.squeeze()
             logit = model(inputs)
-            criterion = nn.CrossEntropyLoss(ignore_index=-1).to(device)
-            loss = criterion(logit, masks)
+            criterion = nn.CrossEntropyLoss().to(device)
+            loss = criterion(logit['final_pred'], masks)
             loss.backward()
             optimizer.step()
 
-        predicts.append(torch.softmax(logit, dim=0).detach().cpu().numpy())
+        predicts.append(torch.softmax(logit['final_pred'], dim=0).detach().cpu().numpy())
         truths.append(masks.detach().cpu().numpy())
         running_loss += loss.item() * inputs.size(0)
     # predicts = np.concatenate(predicts).squeeze()
     # truths = np.concatenate(truths).squeeze()
 
-
-
     predicts = np.concatenate(predicts).squeeze()
     truths = np.concatenate(truths).squeeze()
 
-    jaccard = JaccardIndex(num_classes=3, task="multiclass", ignore_index=-1)
+    jaccard = JaccardIndex(num_classes=4, task="multiclass", ignore_index=0)
 
     iou = jaccard(torch.tensor(predicts), torch.tensor(truths))
     epoch_loss = running_loss / data_size
@@ -82,6 +81,7 @@ colors = [
     [0, 0, 255],  # Синий
     [255, 255, 0]  # Желтый
 ]
+
 
 def colorize_mask(mask):
     # Определяем количество классов и создаем пустой массив для цветовых масок
@@ -108,11 +108,11 @@ def main():
         os.mkdir(save_weight)
     weight_name = 'model_' + str(fine_size + pad_left + pad_right) + '_res18'
 
-    ann_file_name = '_annotations.coco.json'
+    ann_file_name = 'labels_my-project-name_2022-11-15-02-32-33.json'
     # annFile = DATASET_PATH + 'train' + '/' + ann_file_name
     # print(annFile)
     # train_annotations = COCO(annFile)
-    train_path = 'train_n/'
+    train_path = 'train/'
     images_train, _, coco_train, classes_train = filterDataset(ann_file_name=ann_file_name,
                                                                percent_valid=0,
                                                                path_folder=train_path,
@@ -123,7 +123,6 @@ def main():
     print(f"Number of training images: {len(images_train)}")
 
     path_dataset = os.path.join(DATASET_PATH, train_path)
-
 
     train_data = ImageData(annotations=coco_train,
                            image_list=images_train,
@@ -144,21 +143,13 @@ def main():
         pin_memory=True,
     )
     # for j in range(1):
-    img_list, mask_list = next(iter(train_dl))
-    display(img_list=img_list,
-            mask_list=mask_list,
-            # mask_pred_list=outputs123213,
-            # epoch=f'{epoch_ + 1} loss: {round(train_loss, 3)}',
-            # iou=round(iou.item(), 3)
-            )
 
-
-    unet = UNet(n_channels=3, n_classes=3)
+    unet = UNet3Plus(num_classes=4)
     unet.to(device)
     scheduler_step = 100
-    # optimizer = torch.optim.AdamW(unet.parameters())
-    optimizer = torch.optim.SGD(unet.parameters(), lr=max_lr, momentum=momentum, weight_decay=weight_decay)
-    lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, scheduler_step, min_lr)
+    optimizer = torch.optim.AdamW(unet.parameters())
+    # optimizer = torch.optim.SGD(unet.parameters(), lr=max_lr, momentum=momentum, weight_decay=weight_decay)
+    # lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, scheduler_step, min_lr)
 
     best_param = None
     data_size = int(train_data.__len__())
@@ -166,8 +157,8 @@ def main():
     best_iou = 0
 
     for epoch_ in range(epoch):
-        train_loss, iou = train(train_dl, unet, optimizer, data_size=data_size)
-        lr_scheduler.step()
+        train_loss, iou = train(train_dl, unet, optimizer, data_size)
+        # lr_scheduler.step()
 
         if iou > best_iou:
             best_iou = iou
@@ -176,24 +167,15 @@ def main():
         if epoch_ == epoch - 1:
             torch.save(best_param, save_weight + weight_name + str(num_snapshot) + '.pth')
 
-        img_list, mask_list = next(iter(train_dl))
-        # img_list =
-        outputs = unet((img_list.to(device).float()).reshape(4, 3, 128, 128))
-
-        mask_pred = torch.softmax(outputs.squeeze(), dim=0)
-        # outputs = outputs.cpu().data.numpy()
-        outputs123213 = mask_pred.detach().cpu().numpy()
-
-        # dhdhdhf = np.transpose(outputs[0], (1, 2, 0))
-        # dhdhdh123213f = np.transpose(outputs[0], (0, 1, 2))
-        display(img_list=img_list,
-                mask_list=mask_list,
-                mask_pred_list=outputs123213,
-                epoch=f'{epoch_ + 1} loss: {round(train_loss, 3)}',
-                iou=round(iou.item(), 3))
+        for i in range(5):
+            img, mask = train_data[random.randrange(1, 400)]
+            outputs = unet(img.to(device).float().reshape(1, 3, 128, 128))
+            outputs = outputs['final_pred']
+            img_out = torch.softmax(outputs.squeeze(), dim=0)
+            outputs123213 = img_out.detach().cpu().numpy()
+            display(img.detach().cpu().numpy(), mask.detach().cpu().numpy(), np.argmax(outputs123213, axis=0))
 
         print('epoch: {} train_loss: {:.3f} iou: {:.3f}'.format(epoch_ + 1, train_loss, iou))
-    return 0
 
 
 def tensor2numpy(tensor):
@@ -205,31 +187,24 @@ def tensor2numpy(tensor):
     return arr
 
 
-def display(img_list, mask_list, mask_pred_list=None, epoch=None, iou=None):
-    n_row = img_list.shape[0]
-    fig, ax = plt.subplots(ncols=3, nrows=n_row, figsize=(5, 5))
-    fig.suptitle(f'epoch: {epoch}.  iou: {iou}', fontsize=16, fontweight='bold')
+def display(img=None, mask=None, pred=None):
+    ncols_num = 0
+    if img is not None:
+        ncols_num += 1
+    if mask is not None:
+        ncols_num += 1
+    if pred is not None:
+        ncols_num += 1
+    fig, ax = plt.subplots(ncols=ncols_num, nrows=1, figsize=(5, 5))
+    ax[0].set_title('Фото')
+    ax[1].set_title('маска')
+    if pred is not None:
+        ax[2].set_title('пред. маска')
 
-    ax[0][0].set_title('Фото')
-    ax[0][1].set_title('маска')
-    ax[0][2].set_title('пред. маска')
-
-    for j in range(n_row):
-        img = img_list[j]
-        ax[j][0].imshow(tensor2numpy(img))
-        ax[j][0].axis('off')
-        ax[j][1].imshow(colorize_mask(tensor2numpy(mask_list[j])))
-        ax[j][1].axis('off')
-        if mask_pred_list is not None:
-            mask_pred = mask_pred_list[j]
-            # mask_pred = mask_pred + 1
-            mask_pred[mask_pred < 0.6] = 0
-            pred_mask_arg_masx = np.argmax(mask_pred, axis=0)
-            # print(f'max: {pred_mask_arg_masx.max()}')
-            pred_mask = tensor2numpy(pred_mask_arg_masx)
-
-            ax[j][2].imshow(colorize_mask(pred_mask))
-            ax[j][2].axis('off')
+    ax[0].imshow(tensor2numpy(img))
+    ax[1].imshow(colorize_mask(tensor2numpy(mask)))
+    if pred is not None:
+        ax[2].imshow(colorize_mask(tensor2numpy(pred)))
 
     plt.show()
 
@@ -260,10 +235,12 @@ class ImageData(Dataset):
                         img1: torch.Tensor,
                         img2: torch.Tensor
                         ) -> tuple[torch.Tensor, torch.Tensor]:
-        # if random.random() > 0.5:
-        #     params = tf.RandomResizedCrop.get_params(img1, scale=[0.5, 1.0], ratio=[0.75, 1.33])
-        #     img1 = tf.functional.resized_crop(img1, *params, size=self.input_image_size, antialias=True)
-        #     img2 = tf.functional.resized_crop(img2, *params, size=self.input_image_size, antialias=True)
+
+        IMAGE_SIZE = [256, 256]
+        if random.random() > 0.5:
+            params = tf.RandomResizedCrop.get_params(img1, scale=[0.5, 1.0], ratio=[0.75, 1.33])
+            img1 = tf.functional.resized_crop(img1, *params, size=self.input_image_size, antialias=True)
+            img2 = tf.functional.resized_crop(img2, *params, size=self.input_image_size, antialias=True)
 
         if random.random() > 0.5:
             img1 = tf.functional.hflip(img1)
@@ -274,8 +251,6 @@ class ImageData(Dataset):
         if random.random() > 0.5:
             img1 = tf.functional.vflip(img1)
             img2 = tf.functional.vflip(img2)
-
-
         return img1, img2
 
     def __getitem__(self, i: int) -> tuple[torch.Tensor, torch.Tensor]:
@@ -292,7 +267,6 @@ class ImageData(Dataset):
 
         img = torchvision.transforms.Resize(self.input_image_size, antialias=True)(img)
         mask = torchvision.transforms.Resize(self.input_image_size, antialias=True)(mask)
-
 
         if img.shape[0] == 1:
             img = torch.cat([img] * 3)
