@@ -15,7 +15,6 @@ import torchvision.transforms.functional as functional
 from matplotlib import pyplot as plt
 from pycocotools.coco import COCO
 from torch.utils.data import Dataset, DataLoader
-from torchmetrics import JaccardIndex
 from tqdm import tqdm
 
 from controller_vgtu_train.subprocess_train_model_controller import get_last_model_history, update_model_history
@@ -35,7 +34,7 @@ pad_left = 27
 pad_right = 27
 fine_size = 202
 # batch_size = 18
-epoch = 15
+epoch = 30
 snapshot = 6
 max_lr = 0.012
 min_lr = 0.001
