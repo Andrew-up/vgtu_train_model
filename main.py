@@ -8,14 +8,14 @@ import tensorflow as tf
 from matplotlib import pyplot as plt
 
 from controller_vgtu_train.subprocess_train_model_controller import get_last_model_history, update_model_history
-from definitions import MODEL_H5_PATH, MODEL_H5_FILE_NAME, DATASET_PATH
+from definitions import MODEL_PATH, DEFAULT_MODEL_NAME, DATASET_PATH
 from utils.CocoGenerator_new import DatasetGeneratorFromCocoJson
 from utils.get_dataset_coco import filterDataset
 from utils.helpers import delete_legacy_models_and_zip
 from utils.model_losses import plot_segm_history
 from utils.model_train import train_model
 from utils.unet import unet, unet_model
-from utils.vizualizators import gen_viz, display
+from utils.vizualizators import display
 
 def main():
     check_garbage_files_count = delete_legacy_models_and_zip(max_files_legacy=10)
@@ -86,10 +86,10 @@ def main():
     tf.keras.utils.plot_model(model, to_file='model_plot.png', show_shapes=True, show_layer_names=True)
 
     # return 0
-    path_model = os.path.join(MODEL_H5_PATH, MODEL_H5_FILE_NAME)
+    path_model = os.path.join(MODEL_PATH, DEFAULT_MODEL_NAME)
     model_history = get_last_model_history()
     if model_history:
-        path_model = os.path.join(MODEL_H5_PATH, model_history.name_file)
+        path_model = os.path.join(MODEL_PATH, model_history.name_file)
 
     # history = model.fit(train_gen, validation_data=val_gen, steps_per_epoch=10)
     # return 0

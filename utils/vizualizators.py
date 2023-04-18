@@ -6,12 +6,11 @@ import torch
 from matplotlib import pyplot as plt
 from keras.models import Model, load_model
 
-from definitions import ROOT_DIR, DATASET_PATH
-from main_new import ImageData, display
+from definitions import ROOT_DIR, DATASET_PATH, MODEL_PATH
+# from main_new import ImageData, display
 from utils.get_dataset_coco import filterDataset
 from utils.unet_pytorch import UNet
-import onnx
-import onnx2tf
+
 
 
 
@@ -24,26 +23,40 @@ def viz_torch(img, mask):
     plt.show()
 
 
-def torch_to_onnx(batch_size=4):
+def rename_output_file(old_path, new_path):
+    if os.path.exists(old_path):
+        os.replace(old_path, new_path)
+    return new_path
+
+def torch_to_onnx_to_tflite(batch_size=4,
+                            path_pth_file=None,
+                            path_onnx_file=None,
+                            path_tflite_file=None,
+                            result_onnx=None,
+                            image_size=(128, 128),
+                            n_classes=3):
+    import onnx
+    import onnx2tf
+    torch.cuda.empty_cache()
+    # device = torch.device("cpu")
     print(torch.__version__)
     print(torch.cuda.is_available())
     print(torch.version.cuda)
 
-    model = UNet(n_classes=4, n_channels=3)
-    # model = UNet3Plus(num_classes=4)
-    x = torch.randn(1, 3, 32, 32)
-    path_model = os.path.join(ROOT_DIR, 'weights/Unet_model-0.356.pth')
-    onnx_path = os.path.join(ROOT_DIR, 'weights/model_onnx.onnx')
-    res_path = os.path.join(ROOT_DIR, 'weights/result_model')
-    model.load_state_dict(torch.load(path_model, map_location='cpu'))
-    model.eval()
-
-    # print(model)
+    print(path_pth_file)
+    print(path_onnx_file)
+    print(path_tflite_file)
     # return 0
+
+    model = UNet(n_classes=n_classes+1, n_channels=3)
+    # model = UNet3Plus(num_classes=4)
+    x = torch.randn(1, 3, image_size[0], image_size[1])
+    model.load_state_dict(torch.load(path_pth_file, map_location='cpu'))
+    model.eval()
 
     torch.onnx.export(model,
                       x,
-                      onnx_path,
+                      path_onnx_file,
                       export_params=True,
                       verbose=True,
                       dynamic_axes={'input': {0: 'batch_size'},  # variable length axes
@@ -55,14 +68,17 @@ def torch_to_onnx(batch_size=4):
 
     # print(onnx_path)
     onnx2tf.convert(
-        input_onnx_file_path=onnx_path,
-        output_folder_path=res_path,
+        input_onnx_file_path=path_onnx_file,
+        output_folder_path=MODEL_PATH,
         # output_h5=True,
-        # copy_onnx_input_output_names_to_tflite=True,
-        # output_nms_with_dynamic_tensor=True,
+        copy_onnx_input_output_names_to_tflite=True,
+        output_nms_with_dynamic_tensor=True,
         # replace_argmax_to_reducemax_and_indicies_is_float32=True,
         # non_verbose=True
     )
+
+
+    rename_output_file(os.path.join(MODEL_PATH, result_onnx), path_tflite_file)
 
 
 
@@ -90,7 +106,7 @@ def load_model222():
     images_train, _, coco_train, classes_train = filterDataset(ann_file_name=ann_file_name,
                                                                percent_valid=0,
                                                                path_folder=train_path,
-                                                               shuffie=False
+                                                               shuffie=True
                                                                )
     cat_ids = coco_train.getCatIds(classes_train)
     path_dataset = os.path.join(DATASET_PATH, train_path)
@@ -100,11 +116,11 @@ def load_model222():
                            cat_ids=cat_ids,
                            root_path=path_dataset,
                            transform=True,
-                           input_image_size=(128, 128)
+                           input_image_size=(256, 256)
                            )
 
     model = UNet(n_classes=4, n_channels=3)
-    path_model = os.path.join(ROOT_DIR, 'weights/Unet_model-0.408.pth')
+    path_model = os.path.join(ROOT_DIR, 'weights/Unet_model-0.438.pth')
     model.load_state_dict(torch.load(path_model, map_location='cpu'))
     model.eval()
 
@@ -116,7 +132,7 @@ def load_model222():
         res11 = model(res.float())
         img_out = torch.softmax(res11.squeeze(), dim=0)
 
-        sghsfdhs = img_out.detach().numpy()
+        # sghsfdhs = img_out.detach().numpy()
         mask_res = np.argmax(img_out.detach().numpy(), axis=0)
         # hghjfdgfd = mask_res.numpy()
         display(img2, mask, mask_res)
@@ -190,11 +206,11 @@ def colorize_mask(mask):
 
 
 if __name__ == "__main__":
-    torch_to_onnx()
+    torch_to_onnx_to_tflite()
     # pass
     # test_tensorflow_model()
 
-    # load_model222()
+    load_model222()
 # pppppppppp()
 # main()
 # viz_model()

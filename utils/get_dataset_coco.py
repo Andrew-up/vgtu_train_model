@@ -7,10 +7,12 @@ from definitions import DATASET_PATH
 
 def filterDataset(ann_file_name, classes=None, mode='train', percent_valid=50, path_folder=None, shuffie=True):
 
+    weight_list = [0.3]
     # initialize COCO api for instance annotations
-    annFile = DATASET_PATH + path_folder + '/' + ann_file_name
+    annFile = DATASET_PATH + 'annotations/' + ann_file_name
     annFile = os.path.normpath(annFile)
-
+    print(annFile)
+    # return 0
     coco = COCO(annFile)
     print("filterDataset")
     images = []
@@ -27,26 +29,40 @@ def filterDataset(ann_file_name, classes=None, mode='train', percent_valid=50, p
         imgIds = coco.getImgIds()
         images = coco.loadImgs(imgIds)
 
-    # if classes is None:
-    #     classes = list()
-    #     for i in coco.cats:
-    #         name = coco.cats[i]['name']
-    #         classes.append(name)
-    #         # print(name)
+    if classes is None:
+        classes = list()
+        for i in coco.cats:
+            name = coco.cats[i]['name']
+            classes.append(name)
+            # print(name)
 
-    classes2 = set()
-    img_ids = coco.getImgIds()
-    classes = []
-    for img_id in img_ids:
-        ann_ids = coco.getAnnIds(imgIds=[img_id])
-        anns = coco.loadAnns(ann_ids)
-        img_classes = [ann['category_id'] for ann in anns]
-        classes2.update(img_classes)
+    # classes2 = set()
+    # img_ids = coco.getImgIds()
+    # classes2222 = []
+    # for img_id in img_ids:
+    #     ann_ids = coco.getAnnIds(imgIds=[img_id])
+    #     anns = coco.loadAnns(ann_ids)
+    #     img_classes = [ann['category_id'] for ann in anns]
+    #     classes2.update(img_classes)
+    #
+    # for class_id in classes2:
+    #     class_name = coco.loadCats(class_id)[0]['name']
+    #     classes2222.append(class_name)
+    #     print(f'{class_id}: {class_name}')
 
-    for class_id in classes2:
-        class_name = coco.loadCats(class_id)[0]['name']
-        classes.append(class_name)
-        print(f'{class_id}: {class_name}')
+    # class_list = []
+    categories = coco.loadCats(coco.getCatIds())
+    # перебираем категории
+    for category in categories:
+        # получаем id категории
+        category_id = category['id']
+        # получаем аннотации для данной категории
+        ann_ids = coco.getAnnIds(catIds=[category_id])
+        # если есть аннотации, то добавляем 1 в список, иначе 0
+        if len(ann_ids) > 0:
+            weight_list.append(1.0)
+        else:
+            weight_list.append(0.0)
 
 
     unique_images = []
@@ -109,10 +125,10 @@ def filterDataset(ann_file_name, classes=None, mode='train', percent_valid=50, p
 
     # print(len(images_train_unique))
     if classes is not None:
-        return images_train_unique, images_valid_unique, coco, classes
+        return images_train_unique, images_valid_unique, coco, classes, weight_list
     else:
         classes = list()
         for i in coco.cats:
             name = coco.cats[i]['name']
             classes.append(name)
-        return images_train_unique, images_valid_unique, coco, classes
+        return images_train_unique, images_valid_unique, coco, classes, weight_list
