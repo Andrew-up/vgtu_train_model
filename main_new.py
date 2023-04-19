@@ -345,7 +345,8 @@ def main():
     model_tf_lite_name_new = ''
 
     if model_history:
-        model_tf_lite_name_new = f'model_{model_history.version.replace(".", "_")}.tflite'
+        model_v_string = model_history.version.replace('.', '_')
+        model_tf_lite_name_new = f'model_{model_v_string}.tflite'
         path_model_tflite = os.path.join(MODEL_PATH, model_tf_lite_name_new)
         path_model = os.path.join(MODEL_PATH, model_history.name_file)
 
