@@ -495,8 +495,8 @@ class ImageData(Dataset):
         if random.random() > 0.5:
             img1 = tf.functional.vflip(img1)
             img2 = tf.functional.vflip(img2)
-        if random.random() > 0.5:
-            img1 = self.edit_background(img1, img2)
+        # if random.random() > 0.5:
+        #     img1 = self.edit_background(img1, img2)
 
         return img1, img2
 
