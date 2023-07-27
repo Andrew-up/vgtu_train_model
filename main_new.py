@@ -41,14 +41,6 @@ def torch_to_onnx_to_tflite(batch_size=4,
                             n_classes=3):
     import onnx2tf
     torch.cuda.empty_cache()
-    # device = torch.device("cpu")
-    print(torch.__version__)
-    print(torch.cuda.is_available())
-    print(torch.version.cuda)
-
-    print(path_pth_file)
-    print(path_onnx_file)
-    print(path_tflite_file)
     model = UNet(n_classes=n_classes + 1, n_channels=3)
     x = torch.randn(1, 3, image_size[0], image_size[1])
     model.load_state_dict(torch.load(path_pth_file, map_location='cpu'))
