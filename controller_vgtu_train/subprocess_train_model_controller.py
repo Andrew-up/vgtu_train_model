@@ -4,7 +4,7 @@ import requests
 
 from model.model_history import ModelHistory
 
-API = 'http://localhost:5000/api/model_cnn/'
+API = 'http://localhost:8080/api/model_cnn/'
 
 
 def get_last_model_history():
@@ -31,7 +31,7 @@ def update_model_history(data: ModelHistory):
 #     r = requests.post(url_string, data=data_json, headers={"Content-Type": "application/json"})
 #     print(r.text)
 def get_category_not_null():
-    url_string = f'http://localhost:5000/api/categorical/all_not_null/'
+    url_string = f'http://localhost:8080/api/categorical/all_not_null/'
     r = requests.get(url_string)
     return len(r.json())
 
