@@ -1,7 +1,6 @@
 import os
 import random
 import time
-import zipfile
 from datetime import datetime
 from pathlib import Path
 
@@ -9,229 +8,40 @@ import cv2
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import torchvision
 import torchvision.io as io
-import torchvision.transforms as T
 import torchvision.transforms as tf
 import torchvision.transforms.functional as functional
+from matplotlib import pyplot as plt
 from pycocotools.coco import COCO
 from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
 
 from controller_vgtu_train.subprocess_train_model_controller import get_last_model_history, update_model_history
-from definitions import DATASET_PATH
-from definitions import MODEL_PATH, DEFAULT_MODEL_NAME, ROOT_DIR
+from definitions import DATASET_PATH, MODEL_PATH, DEFAULT_MODEL_NAME, ROOT_DIR
 from model.model_history import ModelHistory
+from utils.get_dataset_coco import filterDataset
+from utils.helpers import delete_legacy_models_and_zip
 from utils.unet_pytorch import UNet
+import torchvision.transforms as T
+import torch.nn.functional as F
 
-
-def rename_output_file(old_path, new_path):
-    if os.path.exists(old_path):
-        os.replace(old_path, new_path)
-    return new_path
-
-
-def torch_to_onnx_to_tflite(batch_size=4,
-                            path_pth_file=None,
-                            path_onnx_file=None,
-                            path_tflite_file=None,
-                            result_onnx=None,
-                            image_size=(128, 128),
-                            n_classes=3):
-    import onnx2tf
-    torch.cuda.empty_cache()
-    model = UNet(n_classes=n_classes + 1, n_channels=3)
-    x = torch.randn(1, 3, image_size[0], image_size[1])
-    model.load_state_dict(torch.load(path_pth_file, map_location='cpu'))
-    model.eval()
-
-    torch.onnx.export(model,
-                      x,
-                      path_onnx_file,
-                      export_params=True,
-                      verbose=True,
-                      dynamic_axes={'input': {0: 'batch_size'},  # variable length axes
-                                    'output': {0: 'batch_size'}}
-                      )
-
-    onnx2tf.convert(
-        input_onnx_file_path=path_onnx_file,
-        output_folder_path=MODEL_PATH,
-        copy_onnx_input_output_names_to_tflite=True,
-        output_nms_with_dynamic_tensor=True,
-    )
-
-    rename_output_file(os.path.join(MODEL_PATH, result_onnx), path_tflite_file)
-
-
-def filterDataset(ann_file_name, classes=None, mode='train', percent_valid=50, path_folder=None, shuffie=True):
-    weight_list = [0.3]
-    # initialize COCO api for instance annotations
-    annFile = DATASET_PATH + 'annotations/' + ann_file_name
-    annFile = os.path.normpath(annFile)
-
-    coco = COCO(annFile)
-
-    images = []
-    if classes != None:
-        # iterate for each individual class in the list
-        for className in classes:
-            # get all images containing given categories
-            catIds = coco.getCatIds(catNms=className)
-            imgIds = coco.getImgIds(catIds=catIds)
-            images += coco.loadImgs(imgIds)
-
-    else:
-        imgIds = coco.getImgIds()
-        images = coco.loadImgs(imgIds)
-
-    if classes is None:
-        classes = list()
-        for i in coco.cats:
-            name = coco.cats[i]['name']
-            classes.append(name)
-
-    categories = coco.loadCats(coco.getCatIds())
-    # перебираем категории
-    for category in categories:
-        # получаем id категории
-        category_id = category['id']
-        # получаем аннотации для данной категории
-        ann_ids = coco.getAnnIds(catIds=[category_id])
-        # если есть аннотации, то добавляем 1 в список, иначе 0
-        if len(ann_ids) > 0:
-            weight_list.append(1.0)
-        else:
-            weight_list.append(0.0)
-
-    group_class = []
-
-    for i in classes:
-        l = []
-        catIds = coco.getCatIds(catNms=i)
-        imgssss = coco.getImgIds(catIds=catIds)
-        l += coco.loadImgs(imgssss)
-        valid_files = []
-        for image_one in l:
-            imagePath = DATASET_PATH + path_folder + '/' + image_one['file_name']
-            imagePath = os.path.normpath(imagePath)
-            if os.path.exists(imagePath):
-                valid_files.append(image_one)
-            else:
-                print(f'no image : {imagePath}')
-        group_class.append(valid_files)
-
-    images_train_tmp = []
-    images_valid_tmp = []
-
-    images_train_unique = []
-    images_valid_unique = []
-    for classesss in group_class:
-        if percent_valid > 0:
-            b = round(percent_valid / 100 * len(classesss))
-            images_train_tmp += classesss[b:]
-            images_valid_tmp += classesss[:b]
-        else:
-            images_train_tmp += classesss
-
-    for i in range(len(images_train_tmp)):
-        if images_train_tmp[i] not in images_train_unique:
-            images_train_unique.append(images_train_tmp[i])
-
-    for i in range(len(images_valid_tmp)):
-        if images_valid_tmp[i] not in images_valid_unique:
-            images_valid_unique.append(images_valid_tmp[i])
-
-    if shuffie:
-        random.shuffle(images_train_unique)
-        random.shuffle(images_valid_unique)
-
-    if classes is not None:
-        return images_train_unique, images_valid_unique, coco, classes, weight_list
-    else:
-        classes = list()
-        for i in coco.cats:
-            name = coco.cats[i]['name']
-            classes.append(name)
-        return images_train_unique, images_valid_unique, coco, classes, weight_list
-
+from utils.vizualizators import torch_to_onnx_to_tflite
+import zipfile
 
 n_fold = 5
 pad_left = 27
 pad_right = 27
 fine_size = 202
+# batch_size = 18
 epoch = 30
 snapshot = 6
 max_lr = 0.012
 min_lr = 0.001
 momentum = 0.9
 weight_decay = 1e-4
-
+# n_fold = 5
 device = torch.device('cuda')
-
-file_info = {
-    'name_file': None,
-    'date': None,
-    'path': None
-}
-
-
-def delete_legacy_models_and_zip(max_files_legacy: int):
-    list_pth: file_info = []
-    list_tflite: file_info = []
-    list_zip: file_info = []
-    sum_file_delete = 0
-    for root, dirs, files in os.walk(MODEL_PATH):
-        for file in files:
-            if file.endswith('.pth'):
-                a = os.stat(os.path.join(MODEL_PATH, file))
-                created = time.ctime(a.st_atime)
-                list_pth.append({'name_file': file, 'date': datetime.strptime(created, '%c'),
-                                 'path': os.path.join(MODEL_PATH, file)})
-            if file.endswith('.tflite'):
-                a = os.stat(os.path.join(MODEL_PATH, file))
-                created = time.ctime(a.st_atime)
-                # print(type(created))
-                list_tflite.append({'name_file': file, 'date': datetime.strptime(created, '%c'),
-                                    'path': os.path.join(MODEL_PATH, file)})
-
-            if file.endswith('.zip'):
-                a = os.stat(os.path.join(MODEL_PATH, file))
-                created = time.ctime(a.st_atime)
-                # print(type(created))
-                list_zip.append({'name_file': file, 'date': datetime.strptime(created, '%c'),
-                                 'path': os.path.join(MODEL_PATH, file)})
-
-    newlist_pth = sorted(list_pth, key=lambda d: d['date'], reverse=False)
-    newlist_zip = sorted(list_zip, key=lambda d: d['date'], reverse=False)
-    newlist_tflite = sorted(list_tflite, key=lambda d: d['date'], reverse=False)
-
-    if len(newlist_pth) > max_files_legacy:
-        summ_deletefiles = len(newlist_pth) - max_files_legacy
-        for i in newlist_pth[0:summ_deletefiles]:
-            if os.path.exists(i['path']):
-                os.remove(i['path'])
-                sum_file_delete += 1
-                print(f"REMOVE FILE: {i['path']}")
-
-    if len(newlist_tflite) > max_files_legacy:
-        summ_deletefiles = len(newlist_tflite) - max_files_legacy
-        for i in newlist_tflite[0:summ_deletefiles]:
-            if os.path.exists(i['path']):
-                os.remove(i['path'])
-                sum_file_delete += 1
-                print(f"REMOVE FILE: {i['path']}")
-
-    if len(newlist_zip) > max_files_legacy:
-        summ_deletefiles = len(newlist_zip) - max_files_legacy
-        for i in newlist_zip[0:summ_deletefiles]:
-            print(i['path'])
-            if os.path.exists(i['path']):
-                os.remove(i['path'])
-                sum_file_delete += 1
-                print(f"REMOVE FILE: {i['path']}")
-    return sum_file_delete
 
 
 def get_lr(optimizer):
@@ -248,11 +58,16 @@ def pixel_accuracy(output, mask):
 
 
 def mIoU(pred_mask, mask, smooth=1e-10, n_classes=3):
+    # print(f'pred_mask shpe: {pred_mask.shape}')
+    # print(f'mask shpe: {mask.shape}')
     with torch.no_grad():
         pred_mask = F.softmax(pred_mask, dim=1)
         pred_mask = torch.argmax(pred_mask, dim=1)
         pred_mask = pred_mask.contiguous().view(-1)
         mask = mask.contiguous().view(-1)
+
+        # test123 = mask.detach().cpu().numpy()
+        # test123111 = pred_mask.detach().cpu().numpy()
 
         iou_per_class = []
         for clas in range(0, n_classes):  # loop per pixel class
@@ -277,6 +92,7 @@ def fit(epochs,
         criterion,
         optimizer,
         scheduler,
+        patch=False,
         save_path_model=None,
         model_history: ModelHistory = None,
         len_classes=1):
@@ -289,6 +105,7 @@ def fit(epochs,
     train_acc = []
     lrs = []
     min_loss = np.inf
+    # decrease = 1
     not_improve = 0
 
     if model_history:
@@ -324,7 +141,7 @@ def fit(epochs,
             loss.backward()
             optimizer.step()  # update weight
             optimizer.zero_grad()  # reset gradient
-
+            # step the learning rate
             lrs.append(get_lr(optimizer))
             scheduler.step()
             running_loss += loss.item()
@@ -355,11 +172,15 @@ def fit(epochs,
             if min_loss > (test_loss / len(val_loader)):
                 print('Loss Decreasing.. {:.3f} >> {:.3f} '.format(min_loss, (test_loss / len(val_loader))))
                 min_loss = (test_loss / len(val_loader))
+                # decrease += 1
                 print('saving model...')
                 torch.save(model.state_dict(), save_path_model)
 
                 model_history.current_epochs = e + 1
                 update_model_history(model_history)
+                # if decrease % 5 == 0:
+                #     print('saving model...')
+                #     torch.save(model, 'Unet-Mobilenet_v2_mIoU-{:.3f}.pt'.format(val_iou_score / len(val_loader)))
 
             if (test_loss / len(val_loader)) > min_loss:
                 not_improve += 1
@@ -368,6 +189,18 @@ def fit(epochs,
                 if not_improve == 7:
                     print('Loss not decrease for 7 times, Stop Training')
                     break
+
+            # for j in range(2):
+            #     img, mask = next(iter(train_loader))
+            #     img = img.detach().cpu()[0]
+            #     mask = mask.detach().cpu()[0]
+            #     # pred_mask.detach().cpu().numpy()
+            #     img2 = np.transpose(img, (1, 2, 0))
+            #     res = img[None, :, :, :]
+            #     res11 = model(res.to(device).float())
+            #     img_out = torch.softmax(res11.squeeze(), dim=0)
+            #     mask_res = np.argmax(img_out.detach().cpu().numpy(), axis=0)
+            #     display(img2, mask, mask_res, e)
 
             # iou
             val_iou.append(val_iou_score / len(val_loader))
@@ -389,6 +222,60 @@ def fit(epochs,
                'lrs': lrs}
     print('Total time: {:.2f} m'.format((time.time() - fit_time) / 60))
     return history
+
+
+colors = [
+    [127, 127, 127],  # фон
+    [0, 255, 0],  # Зеленый
+    [0, 0, 255],  # Синий
+    [255, 255, 0]  # Желтый
+]
+
+
+def colorize_mask(mask):
+    # Определяем количество классов и создаем пустой массив для цветовых масок
+    num_classes = np.max(mask) + 1
+    color_mask = np.zeros((mask.shape[0], mask.shape[1], 3), dtype=np.uint8)
+
+    # Создаем цветовую маску для каждого класса
+    for i in range(num_classes):
+        # print(f'class: {i}')
+        # Используем заданный цвет для каждого класса
+        color = colors[i]
+        # Применяем маску и цвет для каждого класса
+        color_mask[mask == i] = color
+
+    return color_mask
+
+
+def plot_loss(history):
+    plt.plot(history['val_loss'], label='val', marker='o')
+    plt.plot(history['train_loss'], label='train', marker='o')
+    plt.title('Loss per epoch')
+    plt.ylabel('loss')
+    plt.xlabel('epoch')
+    plt.legend(), plt.grid()
+    plt.show()
+
+
+def plot_score(history):
+    plt.plot(history['train_miou'], label='train_mIoU', marker='*')
+    plt.plot(history['val_miou'], label='val_mIoU', marker='*')
+    plt.title('Score per epoch')
+    plt.ylabel('mean IoU')
+    plt.xlabel('epoch')
+    plt.legend(), plt.grid()
+    plt.show()
+
+
+def plot_acc(history):
+    plt.plot(history['train_acc'], label='train_accuracy', marker='*')
+    plt.plot(history['val_acc'], label='val_accuracy', marker='*')
+    plt.title('Accuracy per epoch')
+    plt.ylabel('Accuracy')
+    plt.xlabel('epoch')
+    plt.legend(), plt.grid()
+    plt.show()
 
 
 def main():
@@ -458,10 +345,13 @@ def main():
     model_tf_lite_name_new = ''
 
     if model_history:
-        model_tf_lite_name_new = f'model_{model_history.version.replace(".", "_")}.tflite'
+        model_v_string = model_history.version.replace('.', '_')
+        model_tf_lite_name_new = f'model_{model_v_string}.tflite'
         path_model_tflite = os.path.join(MODEL_PATH, model_tf_lite_name_new)
         path_model = os.path.join(MODEL_PATH, model_history.name_file)
 
+    #
+    # return 0
     history = fit(epoch,
                   unet,
                   train_dl,
@@ -473,6 +363,13 @@ def main():
                   model_history=model_history,
                   len_classes=len(classes_train))
 
+    # torch.save(unet.state_dict(), 'Unet-Mobilenet_result.pth')
+
+    plot_loss(history)
+    plot_score(history)
+    plot_acc(history)
+    # print(len(classes_train)+1)
+    # return 0
     torch_to_onnx_to_tflite(path_pth_file=path_model,
                             path_onnx_file=path_model_onnx,
                             path_tflite_file=path_model_tflite,
@@ -481,6 +378,8 @@ def main():
                             n_classes=len(classes_train))
 
     if model_history:
+        # print(input_shape)
+        # print(output_shape)
         model_history.date_train = datetime.now().strftime("%d-%B-%Y %H:%M:%S")
         model_history.num_classes = str(len(classes_train))
         model_history.input_size = input_shape
@@ -494,6 +393,38 @@ def main():
     path_zip = zipfile.ZipFile(f'{os.path.splitext(path_model)[0]}.zip', 'w')
     path_zip.write(path_model_tflite, arcname=f'{model_history.name_file}')
     path_zip.close()
+
+
+def tensor2numpy(tensor):
+    arr = np.array(tensor)
+    if arr.shape[0] == 3:
+        arr = np.transpose(arr, (1, 2, 0))
+    if arr.shape[0] == 1:
+        arr = np.squeeze(arr, axis=0)
+    return arr
+
+
+def display(img=None, mask=None, pred=None, epoch=None):
+    ncols_num = 0
+    if img is not None:
+        ncols_num += 1
+    if mask is not None:
+        ncols_num += 1
+    if pred is not None:
+        ncols_num += 1
+    fig, ax = plt.subplots(ncols=ncols_num, nrows=1, figsize=(5, 5))
+    fig.suptitle(f'epoch: {epoch}', fontsize=20, fontweight='bold')
+    ax[0].set_title('Фото')
+    ax[1].set_title('маска')
+    if pred is not None:
+        ax[2].set_title('пред. маска')
+
+    ax[0].imshow(tensor2numpy(img))
+    ax[1].imshow(colorize_mask(tensor2numpy(mask)))
+    if pred is not None:
+        ax[2].imshow(colorize_mask(tensor2numpy(pred)))
+
+    plt.show()
 
 
 class ImageData(Dataset):
@@ -519,6 +450,7 @@ class ImageData(Dataset):
         return len(self.files)
 
     def edit_background(self, img, mask_image):
+        # print('edit_background')
         img = np.transpose(img.detach().numpy(), (1, 2, 0))
         mask_image = np.transpose(mask_image.detach().numpy(), (1, 2, 0))
 
@@ -539,32 +471,35 @@ class ImageData(Dataset):
 
         background_mask = np.logical_not(np.squeeze(mask_image))
         new_img = np.where(background_mask[..., None], background, img_n)
+        # plt.imshow(new_img)
+        # plt.show()
         new_img = np.transpose(new_img, (2, 1, 0))
         return torch.from_numpy(new_img)
 
     def train_transform(self,
-                        image: torch.Tensor,
-                        binary_mask: torch.Tensor
+                        img1: torch.Tensor,
+                        img2: torch.Tensor
                         ) -> tuple[torch.Tensor, torch.Tensor]:
 
+        # IMAGE_SIZE = [256, 256]
         if random.random() > 0.5:
-            params = tf.RandomResizedCrop.get_params(image, scale=[0.5, 1.0], ratio=[0.75, 1.33])
-            image = tf.functional.resized_crop(image, *params, size=self.input_image_size, antialias=True)
-            binary_mask = tf.functional.resized_crop(binary_mask, *params, size=self.input_image_size, antialias=True)
+            params = tf.RandomResizedCrop.get_params(img1, scale=[0.5, 1.0], ratio=[0.75, 1.33])
+            img1 = tf.functional.resized_crop(img1, *params, size=self.input_image_size, antialias=True)
+            img2 = tf.functional.resized_crop(img2, *params, size=self.input_image_size, antialias=True)
 
         if random.random() > 0.5:
-            image = tf.functional.hflip(image)
-            binary_mask = tf.functional.hflip(binary_mask)
+            img1 = tf.functional.hflip(img1)
+            img2 = tf.functional.hflip(img2)
 
-        autocontrast = T.RandomAutocontrast()
-        image = autocontrast(image)
+        autocontraster = T.RandomAutocontrast()
+        img1 = autocontraster(img1)
         if random.random() > 0.5:
-            image = tf.functional.vflip(image)
-            binary_mask = tf.functional.vflip(binary_mask)
-        if random.random() > 0.5:
-            image = self.edit_background(image, binary_mask)
+            img1 = tf.functional.vflip(img1)
+            img2 = tf.functional.vflip(img2)
+        # if random.random() > 0.5:
+        #     img1 = self.edit_background(img1, img2)
 
-        return image, binary_mask
+        return img1, img2
 
     def __getitem__(self, i: int) -> tuple[torch.Tensor, torch.Tensor]:
         ann_ids = self.annotations.getAnnIds(
@@ -572,9 +507,9 @@ class ImageData(Dataset):
             catIds=self.cat_ids,
             iscrowd=None
         )
-        annotations = self.annotations.loadAnns(ann_ids)
+        anns = self.annotations.loadAnns(ann_ids)
         mask = torch.LongTensor(np.max(np.stack([self.annotations.annToMask(ann) * ann["category_id"]
-                                                 for ann in annotations]), axis=0)).unsqueeze(0)
+                                                 for ann in anns]), axis=0)).unsqueeze(0)
 
         img = io.read_image(self.files[i])
 
@@ -585,7 +520,7 @@ class ImageData(Dataset):
             img = torch.cat([img] * 3)
 
         if self.transform:
-            return self.train_transform(image=img, binary_mask=mask)
+            return self.train_transform(img1=img, img2=mask)
 
         return img, mask
 
