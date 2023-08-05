@@ -22,7 +22,6 @@ def delete_legacy_models_and_zip(max_files_legacy: int):
             if file.endswith('.pth'):
                 a = os.stat(os.path.join(MODEL_PATH, file))
                 created = time.ctime(a.st_atime)
-                # print(type(created))
                 list_pth.append({'name_file': file, 'date': datetime.strptime(created, '%c'),
                                 'path': os.path.join(MODEL_PATH, file)})
             if file.endswith('.tflite'):

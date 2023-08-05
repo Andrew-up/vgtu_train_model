@@ -35,7 +35,7 @@ def torch_to_onnx_to_tflite(batch_size=4,
                             result_onnx=None,
                             image_size=(128, 128),
                             n_classes=3):
-    import onnx
+
     import onnx2tf
     torch.cuda.empty_cache()
     # device = torch.device("cpu")
@@ -46,10 +46,7 @@ def torch_to_onnx_to_tflite(batch_size=4,
     print(path_pth_file)
     print(path_onnx_file)
     print(path_tflite_file)
-    # return 0
-
     model = UNet(n_classes=n_classes+1, n_channels=3)
-    # model = UNet3Plus(num_classes=4)
     x = torch.randn(1, 3, image_size[0], image_size[1])
     model.load_state_dict(torch.load(path_pth_file, map_location='cpu'))
     model.eval()
@@ -63,37 +60,16 @@ def torch_to_onnx_to_tflite(batch_size=4,
                                     'output': {0: 'batch_size'}}
                       )
 
-    # onnx_model = onnx.load('model_onnx.onnx')
-    # print(type(onnx_model))
 
-    # print(onnx_path)
     onnx2tf.convert(
         input_onnx_file_path=path_onnx_file,
         output_folder_path=MODEL_PATH,
-        # output_h5=True,
         copy_onnx_input_output_names_to_tflite=True,
         output_nms_with_dynamic_tensor=True,
-        # replace_argmax_to_reducemax_and_indicies_is_float32=True,
-        # non_verbose=True
     )
 
 
     rename_output_file(os.path.join(MODEL_PATH, result_onnx), path_tflite_file)
-
-
-
-
-    # test123 = convert(input_onnx_file_path='model_onnx.onnx',
-    #                   output_h5=True,
-    #                   output_folder_path=ROOT_DIR)
-
-    # onnx_model = onnx.load('model_onnx.onnx')
-    # tf_rep = prepare(onnx_model)
-
-    print()
-    # onnx_model = onnx.load("model_onnx.onnx")  # load onnx model
-    # tf_rep = prepare(onnx_model)  # prepare tf representation
-    # tf_rep.export_graph("tf_mode.h5")  # export the model
 
 
 def load_model222():

@@ -12,7 +12,7 @@ def filterDataset(ann_file_name, classes=None, mode='train', percent_valid=50, p
     annFile = DATASET_PATH + 'annotations/' + ann_file_name
     annFile = os.path.normpath(annFile)
     print(annFile)
-    # return 0
+
     coco = COCO(annFile)
     print("filterDataset")
     images = []
@@ -34,23 +34,8 @@ def filterDataset(ann_file_name, classes=None, mode='train', percent_valid=50, p
         for i in coco.cats:
             name = coco.cats[i]['name']
             classes.append(name)
-            # print(name)
 
-    # classes2 = set()
-    # img_ids = coco.getImgIds()
-    # classes2222 = []
-    # for img_id in img_ids:
-    #     ann_ids = coco.getAnnIds(imgIds=[img_id])
-    #     anns = coco.loadAnns(ann_ids)
-    #     img_classes = [ann['category_id'] for ann in anns]
-    #     classes2.update(img_classes)
-    #
-    # for class_id in classes2:
-    #     class_name = coco.loadCats(class_id)[0]['name']
-    #     classes2222.append(class_name)
-    #     print(f'{class_id}: {class_name}')
 
-    # class_list = []
     categories = coco.loadCats(coco.getCatIds())
     # перебираем категории
     for category in categories:
@@ -64,36 +49,23 @@ def filterDataset(ann_file_name, classes=None, mode='train', percent_valid=50, p
         else:
             weight_list.append(0.0)
 
-
-    unique_images = []
-
     group_class = []
-    # countimage = 0
 
-    # sums = 0
     for i in classes:
         l = []
         catIds = coco.getCatIds(catNms=i)
-
         imgssss = coco.getImgIds(catIds=catIds)
-        # print(imgssss)
-        # sums += len(imgssss)
         l += coco.loadImgs(imgssss)
         valid_files = []
         for image_one in l:
             imagePath = DATASET_PATH + path_folder + '/' + image_one['file_name']
             imagePath = os.path.normpath(imagePath)
-            # print(imagePath)
             if os.path.exists(imagePath):
                 valid_files.append(image_one)
-                # print(imagePath)
-                # countimage += 1
             else:
                 print(f'no image : {imagePath}')
-
         group_class.append(valid_files)
-    # print(f'countimage : {countimage}')
-    # print(f'sums : {sums}')
+
     images_train_tmp = []
     images_valid_tmp = []
 
@@ -120,10 +92,9 @@ def filterDataset(ann_file_name, classes=None, mode='train', percent_valid=50, p
 
     if shuffie:
         random.shuffle(images_train_unique)
-        # print(len(images_train_unique))
         random.shuffle(images_valid_unique)
 
-    # print(len(images_train_unique))
+
     if classes is not None:
         return images_train_unique, images_valid_unique, coco, classes, weight_list
     else:
