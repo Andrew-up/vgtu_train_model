@@ -12,5 +12,8 @@ scikit-image~=0.19.3
 torchmetrics~=0.11.4
 # torch~=2.0.0+cu118
 torchvision~=0.15.1
-onnx2tf==1.6.7
+onnx2tf
 onnx
+protobuf==3.20.*
+sng4onnx
+psutil

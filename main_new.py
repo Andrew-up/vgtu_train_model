@@ -561,8 +561,10 @@ class ImageData(Dataset):
         if random.random() > 0.5:
             image = tf.functional.vflip(image)
             binary_mask = tf.functional.vflip(binary_mask)
+
         if random.random() > 0.5:
-            image = self.edit_background(image, binary_mask)
+            pass
+            # image = self.edit_background(image, binary_mask)
 
         return image, binary_mask
 
