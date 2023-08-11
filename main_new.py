@@ -19,11 +19,11 @@ from pycocotools.coco import COCO
 from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
 
+from controller_vgtu_train.model_history import ModelHistory
 from controller_vgtu_train.subprocess_train_model_controller import get_last_model_history, update_model_history
 from definitions import DATASET_PATH
 from definitions import MODEL_PATH, DEFAULT_MODEL_NAME, ROOT_DIR
-from model.model_history import ModelHistory
-from utils.unet_pytorch import UNet
+from utilits.unet_pytorch import UNet
 
 
 def rename_output_file(old_path, new_path):
@@ -68,11 +68,12 @@ def torch_to_onnx_to_tflite(batch_size=4,
 def filterDataset(ann_file_name, classes=None, mode='train', percent_valid=50, path_folder=None, shuffie=True):
     weight_list = [0.3]
     # initialize COCO api for instance annotations
-    annFile = DATASET_PATH + 'annotations/' + ann_file_name
+    annFile = os.path.join(DATASET_PATH, ann_file_name)
     annFile = os.path.normpath(annFile)
+    if not os.path.exists(annFile):
+        return [], None, None, None, None
 
     coco = COCO(annFile)
-
     images = []
     if classes != None:
         # iterate for each individual class in the list
@@ -114,7 +115,8 @@ def filterDataset(ann_file_name, classes=None, mode='train', percent_valid=50, p
         l += coco.loadImgs(imgssss)
         valid_files = []
         for image_one in l:
-            imagePath = DATASET_PATH + path_folder + '/' + image_one['file_name']
+            imagePath = os.path.join(DATASET_PATH, path_folder, image_one['file_name'])
+            print(imagePath)
             imagePath = os.path.normpath(imagePath)
             if os.path.exists(imagePath):
                 valid_files.append(image_one)
@@ -402,13 +404,32 @@ def main():
     else:
         print(f'Удалено старых моделей h5 и zip архивов: {check_garbage_files_count}')
 
-    ann_file_name = 'data.json'
-    train_path = 'image/'
+    name = 'default'
+    model_history = get_last_model_history()
+    if model_history.path_dataset:
+        name = model_history.path_dataset
+
+    print(model_history.__dict__)
+    # return 0
+    ann_file_name = Path(name + '/annotations/' + '/data.json')
+    train_path = os.path.normpath(Path(name + '/image/'))
+    print(ann_file_name)
+    print(train_path)
+    BATCH_SIZE = 2
     images_train, _, coco_train, classes_train, weight_list = filterDataset(ann_file_name=ann_file_name,
                                                                             percent_valid=0,
                                                                             path_folder=train_path,
                                                                             shuffie=False
                                                                             )
+    if len(images_train) < BATCH_SIZE:
+        model_history.status = 'Ошибка: Датасет слишком маленький'
+        update_model_history(model_history)
+        return 0
+
+    if not (images_train or coco_train or classes_train or weight_list):
+        model_history.status = 'Ошибка: Фильтрации датасета'
+        update_model_history(model_history)
+        return 0
 
     cat_ids = coco_train.getCatIds(classes_train)
     input_image_size = (256, 256)
@@ -423,7 +444,7 @@ def main():
                            transform=True,
                            input_image_size=input_image_size
                            )
-    BATCH_SIZE = 2
+
     train_dl = DataLoader(
         train_data,
         batch_size=BATCH_SIZE,
@@ -454,7 +475,7 @@ def main():
     model_onnx_file_name = 'model_onnx.onnx'
     path_model_onnx = os.path.join(MODEL_PATH, model_onnx_file_name)
     path_model_tflite = os.path.join(MODEL_PATH, 'model_tflite.tflite')
-    model_history = get_last_model_history()
+
     model_tf_lite_name_new = ''
 
     if model_history:
@@ -511,7 +532,8 @@ class ImageData(Dataset):
         self.annotations = annotations
         self.img_data = image_list
         self.cat_ids = cat_ids
-        self.files = [str(root_path + img["file_name"]) for img in self.img_data]
+        self.files = [str(root_path + '/' + img["file_name"]) for img in self.img_data]
+        print(self.files)
         self.transform = transform
         self.input_image_size = input_image_size
 

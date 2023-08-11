@@ -16,5 +16,5 @@ class ModelHistory(object):
         self.input_size = None
         self.output_size = None
         self.status = None
+        self.path_dataset = None
         self.__dict__.update(entries)
-

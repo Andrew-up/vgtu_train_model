@@ -2,7 +2,7 @@ import json
 
 import requests
 
-from model.model_history import ModelHistory
+from controller_vgtu_train.model_history import ModelHistory
 
 API = 'http://localhost:8080/api/model_cnn/'
 
@@ -41,8 +41,8 @@ if __name__ == '__main__':
 #     m = ModelHistory()
 #     m.status = 'ssss'
 #     add_history_model(m)
-    # print(get_last_model_history())
-    get_category_not_null()
+    print(get_last_model_history().__dict__)
+    # get_category_not_null()
     # m = ModelHistory()
     # m.id = 1
     # m.status = 'test1ddd23'
